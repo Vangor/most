@@ -64,6 +64,88 @@ final class FindSelectionShortcutUITests: XCTestCase {
         assertFindRecoversAndCanReplace(app, pane: .browser, query: "browser", replacement: "b")
     }
 
+    func testFindFieldsKeepArrowKeyEditingWhileFocused() {
+        let app = XCUIApplication()
+        app.launchEnvironment["CMUX_SOCKET_PATH"] = socketPath
+        app.launchEnvironment["CMUX_UI_TEST_GOTO_SPLIT_RECORD_ONLY"] = "1"
+        app.launchEnvironment["CMUX_UI_TEST_GOTO_SPLIT_PATH"] = dataPath
+        launchAndEnsureForeground(app)
+
+        XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 10.0), "Expected main window")
+
+        app.typeKey("d", modifierFlags: [.command])
+        XCTAssertTrue(
+            waitForDataMatch(timeout: 6.0) { data in
+                guard data["lastSplitDirection"] == "right" else { return false }
+                guard let paneCountAfterSplit = Int(data["paneCountAfterSplit"] ?? "") else { return false }
+                return paneCountAfterSplit >= 2
+            },
+            "Expected Cmd+D split before opening browser. data=\(String(describing: loadData()))"
+        )
+        openBrowserInRightPane(app)
+        assertFindArrowEditing(app, pane: .terminal)
+        assertFindArrowEditing(app, pane: .browser)
+    }
+
+    func testBrowserFindUpDownArrowsNavigateMatchesWhileFocused() {
+        let app = XCUIApplication()
+        app.launchEnvironment["CMUX_SOCKET_PATH"] = socketPath
+        app.launchEnvironment["CMUX_UI_TEST_GOTO_SPLIT_RECORD_ONLY"] = "1"
+        app.launchEnvironment["CMUX_UI_TEST_GOTO_SPLIT_PATH"] = dataPath
+        launchAndEnsureForeground(app)
+
+        XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 10.0), "Expected main window")
+
+        app.typeKey("d", modifierFlags: [.command])
+        XCTAssertTrue(
+            waitForDataMatch(timeout: 6.0) { data in
+                guard data["lastSplitDirection"] == "right" else { return false }
+                guard let paneCountAfterSplit = Int(data["paneCountAfterSplit"] ?? "") else { return false }
+                return paneCountAfterSplit >= 2
+            },
+            "Expected Cmd+D split before opening browser. data=\(String(describing: loadData()))"
+        )
+        openBrowserInRightPane(app, url: makeBrowserFindMatchesURL()) { omnibar in
+            self.waitForCondition(timeout: 8.0) {
+                ((omnibar.value as? String) ?? "").contains("data:text/html")
+            }
+        }
+
+        focusPane(.browser, app: app)
+        XCTAssertTrue(
+            waitForDataMatch(timeout: 6.0) { $0["focusedPanelKind"] == "browser" },
+            "Expected browser focus before opening find. data=\(String(describing: loadData()))"
+        )
+        app.typeKey("f", modifierFlags: [.command])
+        let findField = app.textFields[Pane.browser.findFieldId].firstMatch
+        XCTAssertTrue(
+            findField.waitForExistence(timeout: 6.0),
+            "Expected browser find field after Cmd+F. data=\(String(describing: loadData()))"
+        )
+        replaceFindText(app, with: "alpha")
+        XCTAssertTrue(
+            waitForDataMatch(timeout: 8.0) { data in
+                guard let total = Int(data["browserFindTotal"] ?? "") else { return false }
+                return data["browserFindNeedle"] == "alpha" &&
+                    data["browserFindSelected"] == "1" &&
+                    total >= 2
+            },
+            "Expected browser find to select the first match. data=\(String(describing: loadData()))"
+        )
+
+        app.typeKey(XCUIKeyboardKey.downArrow.rawValue, modifierFlags: [])
+        XCTAssertTrue(
+            waitForDataMatch(timeout: 6.0) { $0["browserFindSelected"] == "2" },
+            "Expected Down arrow in browser find to select the next match. data=\(String(describing: loadData()))"
+        )
+
+        app.typeKey(XCUIKeyboardKey.upArrow.rawValue, modifierFlags: [])
+        XCTAssertTrue(
+            waitForDataMatch(timeout: 6.0) { $0["browserFindSelected"] == "1" },
+            "Expected Up arrow in browser find to select the previous match. data=\(String(describing: loadData()))"
+        )
+    }
+
     private enum Pane {
         case terminal
         case browser
@@ -79,16 +161,24 @@ final class FindSelectionShortcutUITests: XCTestCase {
         }
     }
 
-    private func openBrowserInRightPane(_ app: XCUIApplication) {
+    private func openBrowserInRightPane(
+        _ app: XCUIApplication,
+        url: String = "example.com",
+        waitForNavigation: ((XCUIElement) -> Bool)? = nil
+    ) {
         app.typeKey(XCUIKeyboardKey.rightArrow.rawValue, modifierFlags: [.command, .option])
         app.typeKey("l", modifierFlags: [.command, .shift])
         let omnibar = app.textFields["BrowserOmnibarTextField"].firstMatch
         XCTAssertTrue(omnibar.waitForExistence(timeout: 8.0), "Expected browser omnibar")
         app.typeKey("a", modifierFlags: [.command])
         app.typeKey(XCUIKeyboardKey.delete.rawValue, modifierFlags: [])
-        app.typeText("example.com")
+        app.typeText(url)
         app.typeKey(XCUIKeyboardKey.return.rawValue, modifierFlags: [])
-        XCTAssertTrue(waitForOmnibarToContainExampleDomain(omnibar, timeout: 8.0), "Expected browser navigation")
+        if let waitForNavigation {
+            XCTAssertTrue(waitForNavigation(omnibar), "Expected browser navigation")
+        } else {
+            XCTAssertTrue(waitForOmnibarToContainExampleDomain(omnibar, timeout: 8.0), "Expected browser navigation")
+        }
     }
 
     private func assertFindRefocusPreservesSelection(
@@ -268,6 +358,35 @@ final class FindSelectionShortcutUITests: XCTestCase {
         )
     }
 
+    private func assertFindArrowEditing(_ app: XCUIApplication, pane: Pane) {
+        focusPane(pane, app: app)
+        XCTAssertTrue(
+            waitForDataMatch(timeout: 6.0) { $0["focusedPanelKind"] == pane.focusKey },
+            "Expected \(pane.focusKey) focus before arrow editing. data=\(String(describing: loadData()))"
+        )
+        app.typeKey("f", modifierFlags: [.command])
+        let findField = app.textFields[pane.findFieldId].firstMatch
+        XCTAssertTrue(
+            findField.waitForExistence(timeout: 6.0),
+            "Expected \(pane.replacementMessage) field after Cmd+F. data=\(String(describing: loadData()))"
+        )
+        replaceFindText(app, with: "abcd")
+        app.typeKey(XCUIKeyboardKey.leftArrow.rawValue, modifierFlags: [.command])
+        app.typeText(">")
+        app.typeKey(XCUIKeyboardKey.rightArrow.rawValue, modifierFlags: [.command])
+        app.typeText("<")
+        app.typeKey(XCUIKeyboardKey.leftArrow.rawValue, modifierFlags: [])
+        app.typeText("!")
+        focusPane(pane.opposite, app: app)
+        XCTAssertTrue(
+            waitForDataMatch(timeout: 6.0) { data in
+                return data["focusedPanelKind"] == pane.opposite.focusKey &&
+                    data[pane.needleKey] == ">abcd!<"
+            },
+            "Expected arrow keys to edit \(pane.replacementMessage) while focused. data=\(String(describing: loadData()))"
+        )
+    }
+
     private func focusPane(_ pane: Pane, app: XCUIApplication) {
         app.typeKey(pane.arrowKey, modifierFlags: [.command, .option])
     }
@@ -283,6 +402,12 @@ final class FindSelectionShortcutUITests: XCTestCase {
             let value = (omnibar.value as? String) ?? ""
             return value.contains("example.com") || value.contains("example.org")
         }
+    }
+
+    private func makeBrowserFindMatchesURL() -> String {
+        let html = "<!doctype html><meta charset=utf-8><body><p>alpha</p><p>alpha</p><p>alpha</p></body>"
+        let encoded = html.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? html
+        return "data:text/html;charset=utf-8,\(encoded)"
     }
 
     private func launchAndEnsureForeground(_ app: XCUIApplication) {
