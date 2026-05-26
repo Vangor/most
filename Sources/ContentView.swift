@@ -9573,7 +9573,22 @@ private struct SidebarResizerAccessibilityModifier: ViewModifier {
     }
 }
 
-struct SidebarTabItemSettingsSnapshot: Equatable {
+enum SidebarTabItemFontScale {
+    static func scale(for sidebarFontSize: CGFloat) -> CGFloat {
+        GhosttyConfig.clampedSidebarFontSize(sidebarFontSize)
+            / GhosttyConfig.defaultSidebarFontSize
+    }
+}
+
+private enum SidebarFontSizeProvider {
+    static func loadFromGhosttyConfig() async -> CGFloat {
+        await Task.detached(priority: .utility) {
+            GhosttyConfig.load().sidebarFontSize
+        }.value
+    }
+}
+
+private struct SidebarTabItemSettingsSnapshot: Equatable {
     let hidesAllDetails: Bool
     let wrapsWorkspaceTitles: Bool
     let showsWorkspaceDescription: Bool
@@ -9604,8 +9619,7 @@ struct SidebarTabItemSettingsSnapshot: Equatable {
         sidebarShortcutHintXOffset = ShortcutHintDebugSettings.defaultSidebarHintX
         sidebarShortcutHintYOffset = ShortcutHintDebugSettings.defaultSidebarHintY
         alwaysShowShortcutHints = ShortcutHintDebugSettings.alwaysShowHints()
-        sidebarFontScale = GhosttyConfig.clampedSidebarFontSize(sidebarFontSize)
-            / GhosttyConfig.defaultSidebarFontSize
+        sidebarFontScale = SidebarTabItemFontScale.scale(for: sidebarFontSize)
         showsGitBranch = Self.bool(defaults: defaults, key: "sidebarShowGitBranch", defaultValue: true)
         usesVerticalBranchLayout = SidebarBranchLayoutSettings.usesVerticalLayout(defaults: defaults)
         stacksBranchAndDirectory = SidebarBranchDirectoryStackedSettings.isStacked(defaults: defaults)
@@ -9754,19 +9768,23 @@ private final class SidebarTabItemSettingsStore: ObservableObject {
     @Published private(set) var snapshot: SidebarTabItemSettingsSnapshot
 
     private let defaults: UserDefaults
-    private let sidebarFontSizeProvider: () -> CGFloat
+    private let sidebarFontSizeProvider: () async -> CGFloat
+    private var sidebarFontSize: CGFloat
+    private var sidebarFontSizeLoadTask: Task<Void, Never>?
     private var defaultsObserver: NSObjectProtocol?
     private var ghosttyConfigObserver: NSObjectProtocol?
 
     init(
         defaults: UserDefaults = .standard,
-        sidebarFontSizeProvider: @escaping () -> CGFloat = { GhosttyConfig.load().sidebarFontSize }
+        initialSidebarFontSize: CGFloat = GhosttyConfig.defaultSidebarFontSize,
+        sidebarFontSizeProvider: @escaping () async -> CGFloat = SidebarFontSizeProvider.loadFromGhosttyConfig
     ) {
         self.defaults = defaults
+        self.sidebarFontSize = GhosttyConfig.clampedSidebarFontSize(initialSidebarFontSize)
         self.sidebarFontSizeProvider = sidebarFontSizeProvider
         self.snapshot = SidebarTabItemSettingsSnapshot(
             defaults: defaults,
-            sidebarFontSize: sidebarFontSizeProvider()
+            sidebarFontSize: sidebarFontSize
         )
         defaultsObserver = NotificationCenter.default.addObserver(
             forName: UserDefaults.didChangeNotification,
@@ -9777,18 +9795,20 @@ private final class SidebarTabItemSettingsStore: ObservableObject {
                 self?.refreshSnapshot()
             }
         }
+        refreshSidebarFontSize()
         ghosttyConfigObserver = NotificationCenter.default.addObserver(
             forName: .ghosttyConfigDidReload,
             object: nil,
             queue: .main
         ) { [weak self] _ in
             Task { @MainActor [weak self] in
-                self?.refreshSnapshot()
+                self?.refreshSidebarFontSize()
             }
         }
     }
 
     deinit {
+        sidebarFontSizeLoadTask?.cancel()
         if let defaultsObserver {
             NotificationCenter.default.removeObserver(defaultsObserver)
         }
@@ -9800,10 +9820,21 @@ private final class SidebarTabItemSettingsStore: ObservableObject {
     private func refreshSnapshot() {
         let nextSnapshot = SidebarTabItemSettingsSnapshot(
             defaults: defaults,
-            sidebarFontSize: sidebarFontSizeProvider()
+            sidebarFontSize: sidebarFontSize
         )
         guard nextSnapshot != snapshot else { return }
         snapshot = nextSnapshot
+    }
+
+    private func refreshSidebarFontSize() {
+        sidebarFontSizeLoadTask?.cancel()
+        sidebarFontSizeLoadTask = Task { [weak self] in
+            guard let self else { return }
+            let loadedSidebarFontSize = await sidebarFontSizeProvider()
+            guard !Task.isCancelled else { return }
+            sidebarFontSize = GhosttyConfig.clampedSidebarFontSize(loadedSidebarFontSize)
+            refreshSnapshot()
+        }
     }
 }
 
