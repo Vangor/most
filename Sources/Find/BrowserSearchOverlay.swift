@@ -274,6 +274,16 @@ private struct BrowserSearchTextFieldRepresentable: NSViewRepresentable {
                 let isShift = NSApp.currentEvent?.modifierFlags.contains(.shift) ?? false
                 parent.onReturn(isShift)
                 return true
+            case #selector(NSResponder.moveDown(_:)):
+                if textView.hasMarkedText() { return false }
+                rememberSelection(from: textView)
+                parent.onReturn(false)
+                return true
+            case #selector(NSResponder.moveUp(_:)):
+                if textView.hasMarkedText() { return false }
+                rememberSelection(from: textView)
+                parent.onReturn(true)
+                return true
             default:
                 if cmuxFindCommandMayChangeSelection(commandSelector) {
                     DispatchQueue.main.async { [weak self, weak textView] in
