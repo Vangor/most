@@ -19469,6 +19469,9 @@ class TerminalController {
                 format: format,
                 timestamp: Date()
             )
+            if let entry = tab.statusEntries[key] {
+                tab.syncClaudeStatusBadge(from: entry)
+            }
             if let pidValue {
                 tab.recordAgentPID(key: key, pid: pidValue, panelId: panelResolution.panelId)
             }
@@ -19489,10 +19492,13 @@ class TerminalController {
 
         scheduleSidebarMutation(target: target) { _, tab in
             _ = tab.statusEntries.removeValue(forKey: key)
+            tab.clearClaudeStatusBadge(forStatusKey: key)
             tab.clearAgentPID(key: key)
         }
         return "OK"
     }
+
+    // MARK: Claude hook socket state arrival
 
     /// Register an agent PID for stale-session detection without setting a visible status entry.
     /// Usage: set_agent_pid <key> <pid> [--tab=<id>] [--panel=<id>]
@@ -19565,6 +19571,7 @@ class TerminalController {
                 return
             }
             tab.setAgentLifecycle(key: key, panelId: panelResolution.panelId, lifecycle: lifecycle)
+            tab.syncClaudeStatusBadge(fromLifecycleKey: key, lifecycle: lifecycle)
         }
         return "OK"
     }
@@ -19637,6 +19644,9 @@ class TerminalController {
                 panelId: panelResolution.panelId,
                 clearStatus: parsed.options["clear-status"] != nil
             )
+            if parsed.options["clear-status"] != nil {
+                tab.clearClaudeStatusBadge(forStatusKey: key)
+            }
         }
         return "OK"
     }

@@ -71,6 +71,57 @@ struct SidebarStatusEntry: Equatable {
     }
 }
 
+struct WorkspaceClaudeStatusBadge: Equatable {
+    enum State: String {
+        case busy
+        case shell
+        case waiting
+        case idle
+    }
+
+    let state: State
+    let lastBusyAt: Date?
+    let updatedAt: Date
+
+    static func status(from entry: SidebarStatusEntry, previous: WorkspaceClaudeStatusBadge?) -> WorkspaceClaudeStatusBadge? {
+        let loweredValue = entry.value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let state: State
+        if loweredValue.contains("need") || loweredValue.contains("wait") {
+            state = .waiting
+        } else if loweredValue.contains("shell") {
+            state = .shell
+        } else if loweredValue.contains("idle") {
+            state = .idle
+        } else if loweredValue.contains("running") || loweredValue.contains("working") || loweredValue.contains("tool") {
+            state = .busy
+        } else {
+            return nil
+        }
+
+        let lastBusyAt: Date?
+        if state == .busy {
+            lastBusyAt = entry.timestamp
+        } else {
+            lastBusyAt = previous?.lastBusyAt
+        }
+        return WorkspaceClaudeStatusBadge(state: state, lastBusyAt: lastBusyAt, updatedAt: entry.timestamp)
+    }
+
+    static func status(from lifecycle: AgentHibernationLifecycleState, previous: WorkspaceClaudeStatusBadge?) -> WorkspaceClaudeStatusBadge? {
+        let now = Date()
+        switch lifecycle {
+        case .running:
+            return WorkspaceClaudeStatusBadge(state: .busy, lastBusyAt: now, updatedAt: now)
+        case .needsInput:
+            return WorkspaceClaudeStatusBadge(state: .waiting, lastBusyAt: previous?.lastBusyAt, updatedAt: now)
+        case .idle:
+            return WorkspaceClaudeStatusBadge(state: .idle, lastBusyAt: previous?.lastBusyAt, updatedAt: now)
+        case .unknown:
+            return previous
+        }
+    }
+}
+
 struct SidebarMetadataBlock: Equatable {
     let key: String
     let markdown: String
@@ -9461,6 +9512,7 @@ final class Workspace: Identifiable, ObservableObject {
     @Published private(set) var tmuxWorkspaceFlashToken: UInt64 = 0
     var manualUnreadMarkedAt: [UUID: Date] = [:]
     @Published var statusEntries: [String: SidebarStatusEntry] = [:]
+    @Published var claudeStatusBadge: WorkspaceClaudeStatusBadge?
     @Published var metadataBlocks: [String: SidebarMetadataBlock] = [:]
     @Published private(set) var latestConversationMessage: String?
     @Published private(set) var latestSubmittedMessage: String?
@@ -9576,6 +9628,7 @@ final class Workspace: Identifiable, ObservableObject {
                 .eraseToAnyPublisher(),
             sidebarObservationSignal($panelDirectories),
             sidebarObservationSignal($statusEntries),
+            sidebarObservationSignal($claudeStatusBadge),
             sidebarObservationSignal($metadataBlocks),
             sidebarObservationSignal($logEntries),
             sidebarObservationSignal($progress),
@@ -11460,6 +11513,7 @@ final class Workspace: Identifiable, ObservableObject {
 
     func resetSidebarContext(reason: String = "unspecified") {
         statusEntries.removeAll()
+        claudeStatusBadge = nil
         agentPIDs.removeAll()
         agentPIDPanelIdsByKey.removeAll()
         agentPIDKeysByPanelId.removeAll()

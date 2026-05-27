@@ -13774,6 +13774,7 @@ struct SidebarWorkspaceSnapshotBuilder {
         let remoteStateHelpText: String
         let copyableSidebarSSHError: String?
         let latestConversationMessage: String?
+        let claudeStatusBadge: WorkspaceClaudeStatusBadge?
         let metadataEntries: [SidebarStatusEntry]
         let metadataBlocks: [SidebarMetadataBlock]
         let latestLog: SidebarLogEntry?
@@ -14203,6 +14204,14 @@ private struct TabItemView: View, Equatable {
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .layoutPriority(1)
+
+                if let claudeStatusBadge = workspaceSnapshot.claudeStatusBadge {
+                    SidebarClaudeStatusBadgeView(
+                        status: claudeStatusBadge,
+                        isActive: usesInvertedActiveForeground,
+                        activeForegroundColor: activePrimaryTextColor
+                    )
+                }
             }
 
             if let description = workspaceSnapshot.customDescription {
@@ -15188,6 +15197,7 @@ private struct TabItemView: View, Equatable {
             remoteStateHelpText: remoteStateHelpText,
             copyableSidebarSSHError: copyableSidebarSSHError,
             latestConversationMessage: tab.latestConversationMessage,
+            claudeStatusBadge: tab.claudeStatusBadge,
             metadataEntries: detailVisibility.showsMetadata ? tab.sidebarStatusEntriesInDisplayOrder() : [],
             metadataBlocks: detailVisibility.showsMetadata ? tab.sidebarMetadataBlocksInDisplayOrder() : [],
             latestLog: detailVisibility.showsLog ? tab.logEntries.last : nil,
@@ -15767,6 +15777,96 @@ private struct SidebarMetadataRows: View {
 
     private var shouldShowToggle: Bool {
         entries.count > collapsedEntryLimit
+    }
+}
+
+private struct SidebarClaudeStatusBadgeView: View {
+    let status: WorkspaceClaudeStatusBadge
+    let isActive: Bool
+    let activeForegroundColor: Color
+    @State private var now = Date()
+
+    var body: some View {
+        HStack(spacing: 3) {
+            Image(systemName: iconName)
+                .font(.system(size: 8, weight: .semibold))
+            Text(label)
+                .font(.system(size: 9, weight: .semibold))
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+        }
+        .foregroundColor(foregroundColor)
+        .padding(.horizontal, 5)
+        .frame(height: 16)
+        .background(Capsule().fill(foregroundColor.opacity(isActive ? 0.18 : 0.14)))
+        .safeHelp(helpText)
+        .onReceive(Timer.publish(every: 60, on: .main, in: .common).autoconnect()) { value in
+            now = value
+        }
+    }
+
+    private var iconName: String {
+        switch status.state {
+        case .busy:
+            return "arrow.triangle.2.circlepath"
+        case .shell:
+            return "terminal.fill"
+        case .waiting:
+            return "exclamationmark"
+        case .idle:
+            return "pause.fill"
+        }
+    }
+
+    private var label: String {
+        switch status.state {
+        case .busy:
+            return String(localized: "sidebar.claudeStatus.busy", defaultValue: "work")
+        case .shell:
+            return String(localized: "sidebar.claudeStatus.shell", defaultValue: "shell")
+        case .waiting:
+            return String(localized: "sidebar.claudeStatus.waiting", defaultValue: "input")
+        case .idle:
+            return idleAgeLabel
+        }
+    }
+
+    private var idleAgeLabel: String {
+        guard let lastBusyAt = status.lastBusyAt else {
+            return String(localized: "sidebar.claudeStatus.idle", defaultValue: "idle")
+        }
+        let elapsed = max(0, now.timeIntervalSince(lastBusyAt))
+        let minutes = Int(elapsed / 60)
+        if minutes < 60 {
+            return "\(max(1, minutes))m"
+        }
+        let hours = minutes / 60
+        if hours < 24 {
+            return "\(hours)h"
+        }
+        return "\(hours / 24)d"
+    }
+
+    private var foregroundColor: Color {
+        switch status.state {
+        case .waiting:
+            return Color(hex: "#f38ba8") ?? .red
+        case .busy, .shell, .idle:
+            return isActive ? activeForegroundColor : cmuxAccentColor()
+        }
+    }
+
+    private var helpText: String {
+        switch status.state {
+        case .busy:
+            return String(localized: "sidebar.claudeStatus.busy.help", defaultValue: "Claude is working")
+        case .shell:
+            return String(localized: "sidebar.claudeStatus.shell.help", defaultValue: "Claude is at a shell")
+        case .waiting:
+            return String(localized: "sidebar.claudeStatus.waiting.help", defaultValue: "Claude needs input")
+        case .idle:
+            return String(localized: "sidebar.claudeStatus.idle.help", defaultValue: "Claude is idle")
+        }
     }
 }
 

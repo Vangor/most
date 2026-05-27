@@ -4,6 +4,7 @@ import Foundation
 
 extension Workspace {
     private static let structuredAgentHookStatusKeys = AgentHibernationLifecycleStatusKeys.allowedStatusKeys
+    private static let claudeCodeStatusKey = "claude_code"
     private static let managedSubagentEnvironmentKey = "CMUX_AGENT_MANAGED_SUBAGENT"
     private static let truthyStartupEnvironmentValues: Set<String> = ["1", "true", "yes", "on", "enabled"]
 
@@ -146,6 +147,9 @@ extension Workspace {
         _ entry: SidebarStatusEntry,
         visibleStructuredStatusKeys: Set<String>
     ) -> Bool {
+        if entry.key == Self.claudeCodeStatusKey {
+            return false
+        }
         guard Self.structuredAgentHookStatusKeys.contains(entry.key) else {
             return true
         }
@@ -198,6 +202,21 @@ extension Workspace {
         return lhs.key > rhs.key
     }
 
+    func syncClaudeStatusBadge(from entry: SidebarStatusEntry) {
+        guard entry.key == Self.claudeCodeStatusKey else { return }
+        claudeStatusBadge = WorkspaceClaudeStatusBadge.status(from: entry, previous: claudeStatusBadge)
+    }
+
+    func syncClaudeStatusBadge(fromLifecycleKey key: String, lifecycle: AgentHibernationLifecycleState) {
+        guard key == Self.claudeCodeStatusKey else { return }
+        claudeStatusBadge = WorkspaceClaudeStatusBadge.status(from: lifecycle, previous: claudeStatusBadge)
+    }
+
+    func clearClaudeStatusBadge(forStatusKey key: String) {
+        guard key == Self.claudeCodeStatusKey else { return }
+        claudeStatusBadge = nil
+    }
+
     private func isStructuredAgentHookPIDKey(_ key: String) -> Bool {
         Self.structuredAgentHookStatusKeys.contains(agentStatusKey(forAgentPIDKey: key))
     }
@@ -232,6 +251,7 @@ extension Workspace {
         if let statusKeyToClear,
            !hasAgentRuntime(forStatusKey: statusKeyToClear),
            statusEntries.removeValue(forKey: statusKeyToClear) != nil {
+            clearClaudeStatusBadge(forStatusKey: statusKeyToClear)
             didChange = true
         }
         if didChange, refreshPorts {
@@ -266,6 +286,7 @@ extension Workspace {
         guard let runtimeState else { return }
         for (statusKey, statusEntry) in runtimeState.statusEntries {
             statusEntries[statusKey] = statusEntry
+            syncClaudeStatusBadge(from: statusEntry)
         }
         var didAdoptAgentPID = false
         for (key, pid) in runtimeState.agentPIDs {
