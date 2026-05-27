@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP_NAME="cmux DEV"
-BUNDLE_ID="com.cmuxterm.app.debug"
-BASE_APP_NAME="cmux DEV"
+APP_NAME="most DEV"
+BUNDLE_ID="com.4etverg.most.debug"
+BASE_APP_NAME="most DEV"
 DERIVED_DATA=""
 NAME_SET=0
 BUNDLE_SET=0
@@ -119,16 +119,16 @@ write_last_socket_path() {
   local slug=""
 
   case "$bundle_id" in
-    com.cmuxterm.app)
+    com.4etverg.most)
       marker_name="last-socket-path"
       tmp_marker="/tmp/cmux-last-socket-path"
       ;;
-    com.cmuxterm.app.nightly)
+    com.4etverg.most.nightly)
       marker_name="nightly-last-socket-path"
       tmp_marker="/tmp/cmux-nightly-last-socket-path"
       ;;
-    com.cmuxterm.app.nightly.*)
-      slug="$(sanitize_path "${bundle_id#com.cmuxterm.app.nightly.}")"
+    com.4etverg.most.nightly.*)
+      slug="$(sanitize_path "${bundle_id#com.4etverg.most.nightly.}")"
       if [[ -n "$slug" ]]; then
         marker_name="nightly-${slug}-last-socket-path"
         tmp_marker="/tmp/cmux-nightly-${slug}-last-socket-path"
@@ -137,12 +137,12 @@ write_last_socket_path() {
         tmp_marker="/tmp/cmux-nightly-last-socket-path"
       fi
       ;;
-    com.cmuxterm.app.staging)
+    com.4etverg.most.staging)
       marker_name="staging-last-socket-path"
       tmp_marker="/tmp/cmux-staging-last-socket-path"
       ;;
-    com.cmuxterm.app.staging.*)
-      slug="$(sanitize_path "${bundle_id#com.cmuxterm.app.staging.}")"
+    com.4etverg.most.staging.*)
+      slug="$(sanitize_path "${bundle_id#com.4etverg.most.staging.}")"
       if [[ -n "$slug" ]]; then
         marker_name="staging-${slug}-last-socket-path"
         tmp_marker="/tmp/cmux-staging-${slug}-last-socket-path"
@@ -151,15 +151,15 @@ write_last_socket_path() {
         tmp_marker="/tmp/cmux-staging-last-socket-path"
       fi
       ;;
-    com.cmuxterm.app.debug)
+    com.4etverg.most.debug)
       slug="${TAG_SLUG:-}"
       if [[ -n "$slug" ]]; then
         marker_name="dev-${slug}-last-socket-path"
         tmp_marker="/tmp/cmux-dev-${slug}-last-socket-path"
       fi
       ;;
-    com.cmuxterm.app.debug.*)
-      slug="$(sanitize_path "${bundle_id#com.cmuxterm.app.debug.}")"
+    com.4etverg.most.debug.*)
+      slug="$(sanitize_path "${bundle_id#com.4etverg.most.debug.}")"
       if [[ -n "$slug" ]]; then
         marker_name="dev-${slug}-last-socket-path"
         tmp_marker="/tmp/cmux-dev-${slug}-last-socket-path"
@@ -319,14 +319,14 @@ print_tag_cleanup_reminder() {
     done
     echo "Cleanup stale tags only:"
     for tag in "${stale_tags[@]}"; do
-      echo "  pkill -f \"cmux DEV ${tag}.app/Contents/MacOS/cmux DEV\""
+      echo "  pkill -f \"most DEV ${tag}.app/Contents/MacOS/most DEV\""
       echo "  rm -rf \"$(tagged_derived_data_path "$tag")\" \"/tmp/cmux-${tag}\" \"/tmp/cmux-debug-${tag}.sock\""
       echo "  rm -f \"/tmp/cmux-debug-${tag}.log\""
       echo "  rm -f \"$HOME/Library/Application Support/cmux/cmuxd-dev-${tag}.sock\""
     done
   fi
   echo "After you verify current tag, cleanup command:"
-  echo "  pkill -f \"cmux DEV ${current_slug}.app/Contents/MacOS/cmux DEV\""
+  echo "  pkill -f \"most DEV ${current_slug}.app/Contents/MacOS/most DEV\""
   echo "  rm -rf \"$(tagged_derived_data_path "$current_slug")\" \"/tmp/cmux-${current_slug}\" \"/tmp/cmux-debug-${current_slug}.sock\""
   echo "  rm -f \"/tmp/cmux-debug-${current_slug}.log\""
   echo "  rm -f \"$HOME/Library/Application Support/cmux/cmuxd-dev-${current_slug}.sock\""
@@ -399,10 +399,10 @@ if [[ -n "$TAG" ]]; then
     exit 1
   fi
   if [[ "$NAME_SET" -eq 0 ]]; then
-    APP_NAME="cmux DEV ${TAG_SLUG}"
+    APP_NAME="most DEV ${TAG_SLUG}"
   fi
   if [[ "$BUNDLE_SET" -eq 0 ]]; then
-    BUNDLE_ID="com.cmuxterm.app.debug.${TAG_ID}"
+    BUNDLE_ID="com.4etverg.most.debug.${TAG_ID}"
   fi
   if [[ "$DERIVED_SET" -eq 0 ]]; then
     DERIVED_DATA="$(tagged_derived_data_path "$TAG_SLUG")"
