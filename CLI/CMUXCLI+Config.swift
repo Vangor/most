@@ -70,13 +70,13 @@ extension CMUXCLI {
         return """
         Usage: cmux config <doctor|check|validate|path|paths|docs|documentation|reload>
 
-        Inspect cmux.json, print configuration references, or reload the running app.
+        Inspect most.json, print configuration references, or reload the running app.
 
         Subcommands:
           doctor|check|validate [--path <path>]   Validate JSONC syntax for cmux config files.
-          path|paths                              Print cmux.json paths, docs URL, and schema URL.
+          path|paths                              Print most.json paths, docs URL, and schema URL.
           docs|documentation                      Print the same output as `cmux docs settings`.
-          reload                                  Reload Ghostty config + cmux.json and refresh terminals (alias for `cmux reload-config`).
+          reload                                  Reload Ghostty config + most.json and refresh terminals (alias for `cmux reload-config`).
 
         Config files:
           \(Self.primarySettingsDisplayPath)
@@ -88,7 +88,7 @@ extension CMUXCLI {
 
         Examples:
           cmux config doctor
-          cmux config doctor --path .cmux/cmux.json
+          cmux config doctor --path .cmux/most.json
           cmux config reload
         """
     }
@@ -105,8 +105,8 @@ extension CMUXCLI {
             "docs_url": Self.settingsDocsURL,
             "schema_url": Self.settingsSchemaURL,
             "reload_command": "cmux reload-config",
-            "reload_scope": "Reloads Ghostty config + cmux.json and refreshes terminals in place. No app restart needed.",
-            "backup": "Back up any existing cmux.json file to a timestamped .bak copy before editing so the user can revert.",
+            "reload_scope": "Reloads Ghostty config + most.json and refreshes terminals in place. No app restart needed.",
+            "backup": "Back up any existing most.json file to a timestamped .bak copy before editing so the user can revert.",
         ]
 
         if jsonOutput {
@@ -128,10 +128,10 @@ extension CMUXCLI {
         print("Schema:")
         print("  \(Self.settingsSchemaURL)")
         print()
-        print("Before editing cmux.json:")
-        print("  Back up any existing cmux.json file to a timestamped .bak copy so the user can revert.")
+        print("Before editing most.json:")
+        print("  Back up any existing most.json file to a timestamped .bak copy so the user can revert.")
         print()
-        print("Reload after editing (covers BOTH cmux.json and Ghostty config; no app restart needed):")
+        print("Reload after editing (covers BOTH most.json and Ghostty config; no app restart needed):")
         print("  cmux reload-config")
     }
 
@@ -306,8 +306,8 @@ extension CMUXCLI {
             }
             let candidates = [
                 ((current as NSString).appendingPathComponent(".cmux") as NSString)
-                    .appendingPathComponent("cmux.json"),
-                (current as NSString).appendingPathComponent("cmux.json"),
+                    .appendingPathComponent("most.json"),
+                (current as NSString).appendingPathComponent("most.json"),
             ]
             for candidate in candidates {
                 var isDirectory = ObjCBool(false)
