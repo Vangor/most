@@ -74,6 +74,9 @@ final class CmuxSSHURLProcessLauncher {
             try process.run()
             processes[process.processIdentifier] = process
 #if DEBUG
+            if let workingDirectory = request.workingDirectory {
+                cmuxDebugLog("sshURL.standardScheme.workingDirIgnored path=\(workingDirectory)")
+            }
             cmuxDebugLog("sshURL.launchCLI pid=\(process.processIdentifier) socket=\(socketPath) targetLength=\(request.destination.count)")
 #endif
             return true
@@ -164,6 +167,10 @@ extension AppDelegate {
             at: bundleURL,
             toOpenURLsWithScheme: AuthEnvironment.callbackScheme
         ) { _ in }
+        NSWorkspace.shared.setDefaultApplication(
+            at: bundleURL,
+            toOpenURLsWithScheme: "ssh"
+        ) { _ in }
     }
 
     @discardableResult
@@ -204,7 +211,7 @@ extension AppDelegate {
     private func cmuxExternalURLIntentCounts(in urls: [URL]) -> CmuxExternalURLIntentCounts {
         urls.reduce(CmuxExternalURLIntentCounts()) { counts, url in
             var nextCounts = counts
-            switch CmuxSSHURLRequest.parse(url) {
+            switch parseSSHURLRequest(url) {
             case .success(.some), .failure:
                 nextCounts.ssh += 1
             case .success(nil):
@@ -223,6 +230,26 @@ extension AppDelegate {
                 break
             }
             return nextCounts
+        }
+    }
+
+    private func parseSSHURLRequest(_ url: URL) -> Result<CmuxSSHURLRequest?, CmuxSSHURLParseError> {
+        switch CmuxSSHURLRequest.parse(url) {
+        case .success(.some(let request)):
+            return .success(request)
+        case .success(nil):
+            break
+        case .failure(let error):
+            return .failure(error)
+        }
+
+        switch SSHStandardURLRequest.parse(url) {
+        case .success(.some(let request)):
+            return .success(CmuxSSHURLRequest(standardRequest: request))
+        case .success(nil):
+            return .success(nil)
+        case .failure(let error):
+            return .failure(error)
         }
     }
 
@@ -342,7 +369,7 @@ extension AppDelegate {
         var sshURLRequests: [CmuxSSHURLRequest] = []
         var sshURLParseErrors: [CmuxSSHURLParseError] = []
         for url in urls {
-            switch CmuxSSHURLRequest.parse(url) {
+            switch parseSSHURLRequest(url) {
             case .success(.some(let request)):
                 sshURLRequests.append(request)
             case .success(nil):
