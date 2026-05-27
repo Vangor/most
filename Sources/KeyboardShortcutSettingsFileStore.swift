@@ -32,12 +32,12 @@ final class CmuxSettingsFileStore {
 
     static var defaultPrimaryPath: String {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
-        return (home as NSString).appendingPathComponent(".config/cmux/cmux.json")
+        return (home as NSString).appendingPathComponent(".config/most/most.json")
     }
 
     static var defaultFallbackPath: String? {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
-        return (home as NSString).appendingPathComponent(".config/cmux/settings.json")
+        return (home as NSString).appendingPathComponent(".config/most/settings.json")
     }
 
     static var defaultApplicationSupportFallbackPath: String? {
@@ -91,6 +91,7 @@ final class CmuxSettingsFileStore {
         self.appearanceEnvironment = appearanceEnvironment
         importedManagedDefaults = Self.loadImportedManagedDefaults()
 
+        migrateLegacySettingsDirectoryIfNeeded()
         bootstrapPrimaryTemplateIfNeeded()
         // The app init path loads cmux.json before applying language/appearance
         // itself. Running live default side effects here can initialize UI/runtime
@@ -211,6 +212,49 @@ final class CmuxSettingsFileStore {
             try fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: fileURL.path)
         } catch {
             cmuxSettingsFileStoreLogger.warning("failed to bootstrap \(self.primaryPath, privacy: .private(mask: .hash)): \(String(describing: error), privacy: .private(mask: .hash))")
+        }
+    }
+
+    private func migrateLegacySettingsDirectoryIfNeeded() {
+        let primaryURL = URL(fileURLWithPath: primaryPath)
+        let primaryDirectoryURL = primaryURL.deletingLastPathComponent()
+        let legacyDirectoryURL = primaryDirectoryURL
+            .deletingLastPathComponent()
+            .appendingPathComponent("cmux", isDirectory: true)
+
+        guard !fileManager.fileExists(atPath: primaryDirectoryURL.path),
+              fileManager.fileExists(atPath: legacyDirectoryURL.path) else {
+            return
+        }
+
+        let markerURL = primaryDirectoryURL.appendingPathComponent(".migrated-from-cmux", isDirectory: false)
+        do {
+            try fileManager.createDirectory(
+                at: primaryDirectoryURL,
+                withIntermediateDirectories: true,
+                attributes: [.posixPermissions: 0o700]
+            )
+            let legacyContents = try fileManager.contentsOfDirectory(
+                at: legacyDirectoryURL,
+                includingPropertiesForKeys: nil,
+                options: []
+            )
+            for sourceURL in legacyContents {
+                guard sourceURL.lastPathComponent != ".migrated-from-cmux" else {
+                    continue
+                }
+                let destinationURL = sourceURL.lastPathComponent == "cmux.json"
+                    ? primaryURL
+                    : primaryDirectoryURL.appendingPathComponent(sourceURL.lastPathComponent, isDirectory: sourceURL.hasDirectoryPath)
+                if fileManager.fileExists(atPath: destinationURL.path) {
+                    continue
+                }
+                try fileManager.copyItem(at: sourceURL, to: destinationURL)
+            }
+            try Data().write(to: markerURL, options: .atomic)
+            try fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: markerURL.path)
+        } catch {
+            cmuxSettingsFileStoreLogger.warning("failed to migrate legacy cmux settings directory: \(String(describing: error), privacy: .private(mask: .hash))")
         }
     }
 

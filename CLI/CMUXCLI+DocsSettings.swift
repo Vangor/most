@@ -3,8 +3,8 @@ import Foundation
 extension CMUXCLI {
     static let settingsDocsURL = "https://cmux.com/docs/configuration#cmux-json"
     static let settingsSchemaURL = "https://raw.githubusercontent.com/manaflow-ai/cmux/main/web/data/cmux.schema.json"
-    static let primarySettingsDisplayPath = "~/.config/cmux/cmux.json"
-    static let legacySettingsDisplayPath = "~/.config/cmux/settings.json"
+    static let primarySettingsDisplayPath = "~/.config/most/most.json"
+    static let legacySettingsDisplayPath = "~/.config/most/settings.json"
     static let fallbackSettingsDisplayPath = "~/Library/Application Support/com.cmuxterm.app/settings.json"
     static let ghosttyConfigDisplayPath = "~/.config/ghostty/config"
 
@@ -26,7 +26,7 @@ extension CMUXCLI {
         DocsReference(
             topic: "settings",
             aliases: ["configuration", "config", "cmux-json", "settings-json", "settingsjson", "schema"],
-            summary: "cmux-owned settings, cmux.json locations, schema, and reload flow.",
+            summary: "cmux-owned settings, most.json locations, schema, and reload flow.",
             webURL: settingsDocsURL,
             rawResources: [
                 DocsResource(label: "settings schema", url: settingsSchemaURL),
@@ -103,7 +103,7 @@ extension CMUXCLI {
         DocsReference(
             topic: "dock",
             aliases: ["doc", "controls", "right-sidebar", "dock-json"],
-            summary: "Custom right-sidebar terminal controls from .cmux/dock.json or ~/.config/cmux/dock.json.",
+            summary: "Custom right-sidebar terminal controls from .cmux/dock.json or ~/.config/most/dock.json.",
             webURL: "https://cmux.com/docs/dock",
             rawResources: [
                 DocsResource(label: "dock docs", url: "https://raw.githubusercontent.com/manaflow-ai/cmux/main/docs/dock.md"),
@@ -168,9 +168,9 @@ extension CMUXCLI {
         This command does not require a running cmux app or socket.
 
         Agents:
-          Use `cmux docs settings` before editing ~/.config/cmux/cmux.json.
+          Use `cmux docs settings` before editing ~/.config/most/most.json.
           Use `cmux docs dock` before creating or editing .cmux/dock.json.
-          Back up any existing cmux.json file to a timestamped .bak copy before editing so the user can revert.
+          Back up any existing most.json file to a timestamped .bak copy before editing so the user can revert.
           Fetch raw resources with the printed curl commands when you need the latest schema.
         """
     }
@@ -207,9 +207,9 @@ extension CMUXCLI {
                 "path": Self.ghosttyConfigDisplayPath,
                 "note": "Not cmux-owned, but cmux reads it. Use for terminal transparency (background-opacity), blur, font, theme, etc.",
             ]
-            payload["backup"] = "Back up any existing cmux.json file to a timestamped .bak copy before editing so the user can revert."
+            payload["backup"] = "Back up any existing most.json file to a timestamped .bak copy before editing so the user can revert."
             payload["reload_command"] = "cmux reload-config"
-            payload["reload_scope"] = "Reloads Ghostty config + cmux.json and refreshes terminals in place. No app restart needed."
+            payload["reload_scope"] = "Reloads Ghostty config + most.json and refreshes terminals in place. No app restart needed."
         }
         return payload
     }
@@ -260,10 +260,10 @@ extension CMUXCLI {
             print("  \(Self.ghosttyConfigDisplayPath)")
             print("  Use this for terminal transparency (background-opacity), blur, font, theme, etc.")
             print()
-            print("Before editing cmux.json:")
-            print("  Back up any existing cmux.json file to a timestamped .bak copy so the user can revert.")
+            print("Before editing most.json:")
+            print("  Back up any existing most.json file to a timestamped .bak copy so the user can revert.")
             print()
-            print("Reload after editing cmux.json or Ghostty config:")
+            print("Reload after editing most.json or Ghostty config:")
             print("  cmux reload-config   (reloads BOTH and refreshes terminals; no app restart needed)")
         }
     }
@@ -347,11 +347,11 @@ extension CMUXCLI {
         return """
         Usage: cmux settings [open [target]|path|docs|<target>]
 
-        Open cmux Settings, print cmux.json paths, or show settings documentation.
+        Open cmux Settings, print most.json paths, or show settings documentation.
 
         Subcommands:
           open [target]       Open Settings, optionally to a target section.
-          path                Print cmux.json paths, docs URL, and schema URL.
+          path                Print most.json paths, docs URL, and schema URL.
           docs                Print the same output as `cmux docs settings`.
 
         Targets:
@@ -367,10 +367,10 @@ extension CMUXCLI {
         Related (not cmux-owned, but cmux reads it for terminal behavior):
           \(Self.ghosttyConfigDisplayPath)
 
-        Before editing cmux.json:
-          Back up any existing cmux.json file to a timestamped .bak copy so the user can revert.
+        Before editing most.json:
+          Back up any existing most.json file to a timestamped .bak copy so the user can revert.
 
-        Reload after editing cmux.json or Ghostty config:
+        Reload after editing most.json or Ghostty config:
           cmux reload-config   (reloads BOTH and refreshes terminals; no app restart needed)
         """
     }

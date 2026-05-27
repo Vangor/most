@@ -12068,7 +12068,7 @@ struct CMUXCLI {
             Usage: cmux disable-browser [--json]
 
             Disable cmux browser creation and link interception. This overrides
-            browser settings from cmux.json until re-enabled.
+            browser settings from most.json until re-enabled.
             """
         case "enable-browser":
             return """
@@ -12592,7 +12592,7 @@ struct CMUXCLI {
               --cwd <path>         Set the working directory for the new workspace
               --command <text>     Send text+Enter to the new workspace after creation
               --layout <json>      Create workspace with a predefined split layout (inline JSON).
-                                   Uses the same schema as cmux.json layout definitions.
+                                   Uses the same schema as most.json layout definitions.
                                    When provided, --command is ignored (layout surfaces define their own commands).
               --window <id|ref|index>
                                    Target window (default: caller's window from $CMUX_WORKSPACE_ID/$CMUX_SURFACE_ID)
@@ -12940,7 +12940,7 @@ struct CMUXCLI {
             Usage: cmux reload-config
 
             Run the same configuration reload as the Reload Configuration shortcut.
-            This reloads Ghostty config, re-reads ~/.config/cmux/cmux.json, and refreshes terminals.
+            This reloads Ghostty config, re-reads ~/.config/most/most.json, and refreshes terminals.
 
             Example:
               cmux reload-config
@@ -24932,7 +24932,7 @@ export default function cmuxPiSessionExtension(pi: ExtensionAPI) {
     ) throws {
         guard def.name == "grok" else { return }
         let legacyURL = URL(fileURLWithPath: configDir, isDirectory: true)
-            .appendingPathComponent("cmux.json", isDirectory: false)
+            .appendingPathComponent("most.json", isDirectory: false)
         guard legacyURL.path != primaryFilePath,
               FileManager.default.fileExists(atPath: legacyURL.path),
               let data = FileManager.default.contents(atPath: legacyURL.path),
@@ -30134,10 +30134,10 @@ export default function cmuxPiSessionExtension(pi: ExtensionAPI) {
 
         Agent Help:
           To change cmux settings, run `cmux docs settings` and `cmux settings path`; to add Dock controls, run `cmux docs dock`.
-          Back up any existing cmux.json file to a timestamped .bak copy before editing.
+          Back up any existing most.json file to a timestamped .bak copy before editing.
           Use printed curl commands to fetch the latest docs/schema, and prefer Ghostty config for terminal behavior Ghostty already supports.
           Ghostty config lives at ~/.config/ghostty/config (controls terminal transparency, blur, font, theme, keybinds, etc.).
-          `cmux reload-config` reloads BOTH Ghostty config and ~/.config/cmux/cmux.json and refreshes terminals in place. No app restart needed.
+          `cmux reload-config` reloads BOTH Ghostty config and ~/.config/most/most.json and refreshes terminals in place. No app restart needed.
 
         Commands:
           welcome
