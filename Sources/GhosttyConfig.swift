@@ -8,8 +8,9 @@ struct GhosttyConfig {
     }
 
     // Native fallback for fresh installs when the user hasn't chosen terminal colors yet.
+    // Dark default is the studio's p-dev palette (cyan-led warm dark).
     static let cmuxDefaultLightThemeName = "Apple System Colors Light"
-    static let cmuxDefaultDarkThemeName = "Apple System Colors"
+    static let cmuxDefaultDarkThemeName = "p-dev"
 
     private static let loadCacheLock = NSLock()
     private static var cachedConfigsByColorScheme: [ColorSchemePreference: GhosttyConfig] = [:]

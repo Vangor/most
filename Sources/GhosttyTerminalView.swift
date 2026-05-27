@@ -7675,7 +7675,7 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
 
     private func installEventMonitor() {
         guard eventMonitor == nil else { return }
-        eventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.scrollWheel]) { [weak self] event in
+        eventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.scrollWheel, .flagsChanged]) { [weak self] event in
             return self?.localEventHandler(event) ?? event
         }
     }
@@ -7684,9 +7684,37 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
         switch event.type {
         case .scrollWheel:
             return localEventScrollWheel(event)
+        case .flagsChanged:
+            return localEventFlagsChanged(event)
         default:
             return event
         }
+    }
+
+    private func localEventFlagsChanged(_ event: NSEvent) -> NSEvent? {
+        guard let window, let surface = surface else { return event }
+        if let eventWindow = event.window, window != eventWindow {
+            return event
+        }
+
+        let suppressCommandPathHover = shouldSuppressCommandPathHover(for: event.modifierFlags)
+        let eventPoint = convert(event.locationInWindow, from: nil)
+        trackMousePointIfUsable(eventPoint)
+        ghostty_surface_mouse_pos(
+            surface,
+            eventPoint.x,
+            bounds.height - eventPoint.y,
+            hoverModsFromFlags(
+                event.modifierFlags,
+                suppressCommandPathHover: suppressCommandPathHover
+            )
+        )
+        updateWordPathHover(
+            at: eventPoint,
+            cmdHeld: event.modifierFlags.contains(.command),
+            suppressPathHover: suppressCommandPathHover
+        )
+        return event
     }
 
     private func localEventScrollWheel(_ event: NSEvent) -> NSEvent? {
@@ -7729,10 +7757,7 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
             self.windowObserver = nil
         }
         // Balance the cursor stack if the view is removed while hover is active
-        if wordPathHoverActive {
-            wordPathHoverActive = false
-            NSCursor.pop()
-        }
+        clearCommandHoverCursor()
 #if DEBUG
         cmuxDebugLog(
             "surface.view.windowMove surface=\(terminalSurface?.id.uuidString.prefix(5) ?? "nil") " +
@@ -8606,6 +8631,7 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
             imeConsumedKeyUps.removeAll()
             desiredFocus = false
             terminalSurface?.recordExternalFocusState(false)
+            clearCommandHoverCursor()
         }
         if result, let surface = surface {
             let now = CACurrentMediaTime()
@@ -9829,8 +9855,8 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
     }
     #endif
 
-    /// Update the pointing-hand cursor when Cmd-hovering over a bare filename
-    /// that exists in the terminal's CWD.
+    /// Update the pointing-hand cursor when Cmd-hovering over a clickable token
+    /// in the terminal surface.
     private func updateWordPathHover(
         at point: NSPoint? = nil,
         cmdHeld: Bool,
@@ -9838,10 +9864,7 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
     ) {
         let hoverWasActive = wordPathHoverActive
         guard cmdHeld, !suppressPathHover else {
-            if wordPathHoverActive {
-                wordPathHoverActive = false
-                NSCursor.pop()
-            }
+            clearCommandHoverCursor()
 #if DEBUG
             if cmdHeld || suppressPathHover || hoverWasActive {
                 runtimeDebugLog(
@@ -9862,7 +9885,8 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
         }
 
         let resolution = resolveWordUnderCursorPath(at: point)
-        if resolution != nil {
+        let hoverTargetIsURL = resolution == nil && resolveWordUnderCursorLinkTarget() != nil
+        if resolution != nil || hoverTargetIsURL {
             if !wordPathHoverActive {
                 wordPathHoverActive = true
                 NSCursor.pointingHand.push()
@@ -9879,18 +9903,49 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
                 "hover_active_before": hoverWasActive,
                 "hover_active_after": wordPathHoverActive
             ]
+            if hoverTargetIsURL {
+                payload["hover_target_is_url"] = "1"
+            }
             for (key, value) in runtimeDebugResolutionPayload(resolution) {
                 payload[key] = value
             }
             runtimeDebugLog(
                 hypothesisID: resolution == nil ? "h1" : "h2",
                 name: "hover_update",
-                expected: "resolved path only when hover should activate",
+                expected: "resolved clickable target only when hover should activate",
                 actual: wordPathHoverActive ? "hover_active" : "hover_inactive",
                 data: payload
             )
         }
 #endif
+    }
+
+    private func clearCommandHoverCursor() {
+        if wordPathHoverActive {
+            wordPathHoverActive = false
+            NSCursor.pop()
+        }
+    }
+
+    private func resolveWordUnderCursorLinkTarget() -> TerminalOpenURLTarget? {
+        guard let surface = surface else { return nil }
+
+        var text = ghostty_text_s()
+        guard ghostty_surface_quicklook_word(surface, &text) else { return nil }
+        defer { ghostty_surface_free_text(surface, &text) }
+        guard text.text_len > 0, let ptr = text.text else { return nil }
+
+        let wordData = Data(bytes: ptr, count: Int(text.text_len))
+        guard let decodedWord = String(bytes: wordData, encoding: .utf8) else { return nil }
+#if DEBUG
+        let resolvedQuicklookWord = cmuxTerminalCmdClickQuicklookOverride(decodedWord)
+#else
+        let resolvedQuicklookWord = decodedWord
+#endif
+        guard let target = resolveTerminalOpenURLTarget(resolvedQuicklookWord) else {
+            return nil
+        }
+        return target.url.isFileURL ? nil : target
     }
 
     private func resolvedWordPathWorkingDirectory(
@@ -10521,10 +10576,7 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
     }
 
     override func mouseExited(with event: NSEvent) {
-        if wordPathHoverActive {
-            wordPathHoverActive = false
-            NSCursor.pop()
-        }
+        clearCommandHoverCursor()
         guard let surface = surface else { return }
         if NSEvent.pressedMouseButtons != 0 {
             return
@@ -10610,6 +10662,7 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
         if let trackingArea {
             removeTrackingArea(trackingArea)
         }
+        clearCommandHoverCursor()
         terminalSurface = nil
     }
 
