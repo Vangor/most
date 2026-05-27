@@ -1,9 +1,9 @@
-<h1 align="center">cmux</h1>
+<h1 align="center">most</h1>
 <p align="center">A Ghostty-based macOS terminal with vertical tabs and notifications for AI coding agents</p>
 
 <p align="center">
   <a href="https://github.com/manaflow-ai/cmux/releases/latest/download/cmux-macos.dmg">
-    <img src="./docs/assets/macos-badge.png" alt="Download cmux for macOS" width="180" />
+    <img src="./docs/assets/macos-badge.png" alt="Download most for macOS" width="180" />
   </a>
 </p>
 
@@ -18,11 +18,11 @@
 </p>
 
 <p align="center">
-  <img src="./docs/assets/main-first-image.png" alt="cmux screenshot" width="900" />
+  <img src="./docs/assets/main-first-image.png" alt="most screenshot" width="900" />
 </p>
 
 <p align="center">
-  <a href="https://www.youtube.com/watch?v=i-WxO5YUTOs">▶ Demo video</a> · <a href="https://cmux.com/blog/zen-of-cmux">The Zen of cmux</a>
+  <a href="https://www.youtube.com/watch?v=i-WxO5YUTOs">▶ Demo video</a> · <a href="https://cmux.com/blog/zen-of-cmux">The Zen of most</a>
 </p>
 
 ## Features
@@ -70,7 +70,7 @@ Sidebar shows git branch, linked PR status/number, working directory, listening 
 <code>cmux ssh user@remote</code> creates a workspace for a remote machine. Browser panes route through the remote network so localhost just works. Drag an image into a remote session to upload via scp.
 </td>
 <td width="60%">
-<img src="./docs/assets/ssh.png" alt="cmux SSH" width="100%" />
+<img src="./docs/assets/ssh.png" alt="most SSH" width="100%" />
 </td>
 </tr>
 <tr>
@@ -85,7 +85,7 @@ Sidebar shows git branch, linked PR status/number, working directory, listening 
 </table>
 
 - **Browser import** — Import cookies, history, and sessions from Chrome, Firefox, Arc, and 20+ browsers so browser panes start authenticated
-- **Custom commands** — Define project-specific actions in [`cmux.json`](https://cmux.com/docs/custom-commands) that launch from the command palette
+- **Custom commands** — Define project-specific actions in [`most.json`](https://cmux.com/docs/custom-commands) that launch from the command palette
 - **Scriptable** — CLI and socket API to create workspaces, split panes, send keystrokes, and automate the browser
 - **Native macOS app** — Built with Swift and AppKit, not Electron. Fast startup, low memory.
 - **Ghostty compatible** — Reads your existing `~/.config/ghostty/config` for themes, fonts, and colors
@@ -96,10 +96,10 @@ Sidebar shows git branch, linked PR status/number, working directory, listening 
 ### DMG (recommended)
 
 <a href="https://github.com/manaflow-ai/cmux/releases/latest/download/cmux-macos.dmg">
-  <img src="./docs/assets/macos-badge.png" alt="Download cmux for macOS" width="180" />
+  <img src="./docs/assets/macos-badge.png" alt="Download most for macOS" width="180" />
 </a>
 
-Open the `.dmg` and drag cmux to your Applications folder. cmux auto-updates via Sparkle, so you only need to download once.
+Open the `.dmg` and drag most to your Applications folder. most auto-updates via Sparkle, so you only need to download once.
 
 ### Homebrew
 
@@ -116,11 +116,11 @@ brew upgrade --cask cmux
 
 On first launch, macOS may ask you to confirm opening an app from an identified developer. Click **Open** to proceed.
 
-## Why cmux?
+## Why most?
 
 I run a lot of Claude Code and Codex sessions in parallel. I was using Ghostty with a bunch of split panes, and relying on native macOS notifications to know when an agent needed me. But Claude Code's notification body is always just "Claude is waiting for your input" with no context, and with enough tabs open I couldn't even read the titles anymore.
 
-I tried a few coding orchestrators but most of them were Electron/Tauri apps and the performance bugged me. I also just prefer the terminal since GUI orchestrators lock you into their workflow. So I built cmux as a native macOS app in Swift/AppKit. It uses libghostty for terminal rendering and reads your existing Ghostty config for themes, fonts, and colors.
+I tried a few coding orchestrators but most of them were Electron/Tauri apps and the performance bugged me. I also just prefer the terminal since GUI orchestrators lock you into their workflow. So I built most as a native macOS app in Swift/AppKit. It uses libghostty for terminal rendering and reads your existing Ghostty config for themes, fonts, and colors.
 
 The main additions are the sidebar and notification system. The sidebar has vertical tabs that show git branch, linked PR status/number, working directory, listening ports, and the latest notification text for each workspace. The notification system picks up terminal sequences (OSC 9/99/777) and has a CLI (`cmux notify`) you can wire into agent hooks for Claude Code, OpenCode, etc. When an agent is waiting, its pane gets a blue ring and the tab lights up in the sidebar, so I can tell which one needs me across splits and tabs. Cmd+Shift+U jumps to the most recent unread.
 
@@ -128,11 +128,11 @@ The in-app browser has a scriptable API ported from [agent-browser](https://gith
 
 Everything is scriptable through the CLI and socket API — create workspaces/tabs, split panes, send keystrokes, open URLs in the browser.
 
-## The Zen of cmux
+## The Zen of most
 
-cmux is not prescriptive about how developers hold their tools. It's a terminal and browser with a CLI, and the rest is up to you.
+most is not prescriptive about how developers hold their tools. It's a terminal and browser with a CLI, and the rest is up to you.
 
-cmux is a primitive, not a solution. It gives you a terminal, a browser, notifications, workspaces, splits, tabs, and a CLI to control all of it. cmux doesn't force you into an opinionated way to use coding agents. What you build with the primitives is yours.
+most is a primitive, not a solution. It gives you a terminal, a browser, notifications, workspaces, splits, tabs, and a CLI to control all of it. most doesn't force you into an opinionated way to use coding agents. What you build with the primitives is yours.
 
 The best developers have always built their own tools. Nobody has figured out the best way to work with agents yet, and the teams building closed products definitely haven't either. The developers closest to their own codebases will figure it out first.
 
@@ -140,7 +140,7 @@ Give a million developers composable primitives and they'll collectively find th
 
 ## Documentation
 
-For more info on how to configure cmux, [head over to our docs](https://cmux.com/docs/getting-started?utm_source=readme).
+For more info on how to configure most, [head over to our docs](https://cmux.com/docs/getting-started?utm_source=readme).
 
 ## Keyboard Shortcuts
 
@@ -238,22 +238,22 @@ Command palette navigation shortcuts, including ⌃ P, are also customizable and
 
 ## Nightly Builds
 
-[Download cmux NIGHTLY](https://github.com/manaflow-ai/cmux/releases/download/nightly/cmux-nightly-macos.dmg)
+[Download most NIGHTLY](https://github.com/manaflow-ai/cmux/releases/download/nightly/cmux-nightly-macos.dmg)
 
-cmux NIGHTLY is a separate app with its own bundle ID, so it runs alongside the stable version. Built automatically from the latest `main` commit and auto-updates via its own Sparkle feed.
+most NIGHTLY is a separate app with its own bundle ID, so it runs alongside the stable version. Built automatically from the latest `main` commit and auto-updates via its own Sparkle feed.
 
 Report nightly bugs on [GitHub Issues](https://github.com/manaflow-ai/cmux/issues) or in [#nightly-bugs on Discord](https://discord.gg/xsgFEVrWCZ).
 
 ## Session restore
 
-Quitting cmux saves the current session. On relaunch, cmux restores app-owned
+Quitting most saves the current session. On relaunch, most restores app-owned
 state:
 - Window/workspace/pane layout
 - Working directories
 - Terminal scrollback (best effort)
 - Browser URL and navigation history
 
-cmux does not checkpoint arbitrary live process state. tmux, vim, shells, and
+most does not checkpoint arbitrary live process state. tmux, vim, shells, and
 unsupported terminal apps reopen as normal terminals.
 
 Supported agent sessions can resume when hooks have saved a native session ID.
@@ -268,7 +268,7 @@ cmux hooks setup --agent opencode
 `cmux hooks setup` installs supported agents it can find and prints a summary
 for skipped agents. Supported resume integrations include Claude Code, Codex,
 Grok, OpenCode, Pi, Amp, Cursor CLI, Gemini, Rovo Dev, Copilot, CodeBuddy,
-Factory, and Qoder. Claude Code is handled by the cmux Claude wrapper when Claude
+Factory, and Qoder. Claude Code is handled by the most Claude wrapper when Claude
 integration is enabled in Settings.
 
 Advanced users and integrations can attach a custom resume command to the
@@ -281,18 +281,18 @@ cmux surface resume show --json
 cmux surface resume clear --checkpoint work
 ```
 
-The binding stays attached to the cmux surface. Public CLI or socket-created
+The binding stays attached to the most surface. Public CLI or socket-created
 bindings are stored for inspection and manual restore unless you approve a
 signed command prefix for automatic restore. Approved prefixes are also bound to
 the working directory and exact environment values, when present. Review or edit
-approvals in **Settings > Terminal > Resume Commands**. cmux only auto-runs
+approvals in **Settings > Terminal > Resume Commands**. most only auto-runs
 resume bindings it marks trusted, such as live process-detected tmux bindings or
 user-approved prefixes. Sensitive environment keys such as tokens, passwords,
 secrets, and API keys are dropped before a resume binding is stored.
 
 To keep restored agent terminals idle instead of automatically running their resume commands,
 turn off **Settings > Terminal > Resume Agent Sessions on Reopen** or set this in
-`~/.config/cmux/cmux.json`:
+`~/.config/most/most.json`:
 
 ```json
 {
@@ -302,7 +302,7 @@ turn off **Settings > Terminal > Resume Agent Sessions on Reopen** or set this i
 }
 ```
 
-This only disables automatic agent resume commands. cmux still restores the saved layout,
+This only disables automatic agent resume commands. most still restores the saved layout,
 working directories, scrollback, and browser history.
 
 If you need to reapply the last saved snapshot manually, use:
@@ -310,9 +310,9 @@ If you need to reapply the last saved snapshot manually, use:
 - `⌘ ⇧ O`
 - `cmux restore-session`
 
-Under the hood, cmux writes a versioned snapshot under
-`~/Library/Application Support/cmux/` and agent hooks write session mappings
-under `~/.cmuxterm/`. On restore, cmux rebuilds the layout first, then runs the
+Under the hood, most writes a versioned snapshot under
+`~/Library/Application Support/most/` and agent hooks write session mappings
+under `~/.cmuxterm/`. On restore, most rebuilds the layout first, then runs the
 supported agent's native resume command when automatic agent resume is enabled.
 
 Read the full guide at <https://cmux.com/docs/session-restore>.
@@ -334,7 +334,7 @@ Ways to get involved:
 - Follow us on X for updates [@manaflowai](https://x.com/manaflowai), [@lawrencecchen](https://x.com/lawrencecchen), and [@austinywang](https://x.com/austinywang)
 - Join the conversation on [Discord](https://discord.gg/xsgFEVrWCZ)
 - Create and participate in [GitHub issues](https://github.com/manaflow-ai/cmux/issues) and [discussions](https://github.com/manaflow-ai/cmux/discussions)
-- Let us know what you're building with cmux
+- Let us know what you're building with most
 
 ## Community
 
@@ -352,7 +352,7 @@ cmux is free, open source, and always will be. If you'd like to support developm
 **[Get Founder's Edition](https://buy.stripe.com/3cI00j2Ld0it5OU33r5EY0q)**
 
 - **Prioritized feature requests/bug fixes**
-- **Early access: cmux AI that gives you context on every workspace, tab and panel**
+- **Early access: most AI that gives you context on every workspace, tab and panel**
 - **Early access: iOS app with terminals synced between desktop and phone**
 - **Early access: Cloud VMs**
 - **Early access: Voice mode**
@@ -360,6 +360,6 @@ cmux is free, open source, and always will be. If you'd like to support developm
 
 ## License
 
-cmux is open source under [GPL-3.0-or-later](LICENSE).
+most is open source under [GPL-3.0-or-later](LICENSE).
 
 If your organization cannot comply with GPL, a commercial license is available. Contact [founders@manaflow.com](mailto:founders@manaflow.com) for details.
