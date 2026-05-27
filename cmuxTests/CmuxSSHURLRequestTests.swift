@@ -86,6 +86,124 @@ final class CmuxSSHURLRequestTests: XCTestCase {
         }
     }
 
+    func testParsesStandardSSHURLHostOnly() throws {
+        let url = try XCTUnwrap(URL(string: "ssh://dev.example.com"))
+
+        switch SSHStandardURLRequest.parse(url) {
+        case .success(.some(let request)):
+            XCTAssertEqual(request.destination, "dev.example.com")
+            XCTAssertNil(request.port)
+            XCTAssertNil(request.title)
+            XCTAssertNil(request.workingDirectory)
+        case .success(nil):
+            XCTFail("Expected standard SSH URL request")
+        case .failure(let error):
+            XCTFail("Unexpected parse error: \(error)")
+        }
+    }
+
+    func testParsesStandardSSHURLWithUserPortAndPath() throws {
+        let url = try XCTUnwrap(URL(string: "ssh://user@host:2222/some/path"))
+
+        switch SSHStandardURLRequest.parse(url) {
+        case .success(.some(let request)):
+            XCTAssertEqual(request.destination, "user@host")
+            XCTAssertEqual(request.port, 2222)
+            XCTAssertEqual(request.workingDirectory, "/some/path")
+            XCTAssertEqual(request.title, nil)
+            XCTAssertEqual(
+                CmuxSSHURLRequest(standardRequest: request).cliArguments,
+                ["ssh", "--port", "2222", "user@host"]
+            )
+        case .success(nil):
+            XCTFail("Expected standard SSH URL request")
+        case .failure(let error):
+            XCTFail("Unexpected parse error: \(error)")
+        }
+    }
+
+    func testParsesStandardSSHURLFragmentAsSessionName() throws {
+        var components = URLComponents()
+        components.scheme = "ssh"
+        components.user = "user"
+        components.host = "host"
+        components.port = 2222
+        components.path = "/path"
+        components.queryItems = [
+            URLQueryItem(name: "fragment", value: "mysess")
+        ]
+        let url = try XCTUnwrap(components.url)
+
+        switch SSHStandardURLRequest.parse(url) {
+        case .success(.some(let request)):
+            XCTAssertEqual(request.destination, "user@host")
+            XCTAssertEqual(request.port, 2222)
+            XCTAssertEqual(request.workingDirectory, "/path")
+            XCTAssertEqual(request.title, "mysess")
+            XCTAssertEqual(
+                CmuxSSHURLRequest(standardRequest: request).cliArguments,
+                ["ssh", "--port", "2222", "--name", "mysess", "user@host"]
+            )
+        case .success(nil):
+            XCTFail("Expected standard SSH URL request")
+        case .failure(let error):
+            XCTFail("Unexpected parse error: \(error)")
+        }
+    }
+
+    func testRejectsStandardSSHUserPrefixedWithDash() throws {
+        let url = try XCTUnwrap(URL(string: "ssh://-attacker@host"))
+
+        switch SSHStandardURLRequest.parse(url) {
+        case .failure(.destinationStartsWithDash):
+            break
+        default:
+            XCTFail("Expected dash-prefixed user rejection")
+        }
+    }
+
+    func testRejectsStandardSSHPathPrefixedWithDash() throws {
+        let url = try XCTUnwrap(URL(string: "ssh://host/--rce"))
+
+        switch SSHStandardURLRequest.parse(url) {
+        case .failure(.destinationStartsWithDash):
+            break
+        default:
+            XCTFail("Expected dash-prefixed path rejection")
+        }
+    }
+
+    func testRejectsStandardSSHInvalidPort() throws {
+        let url = try XCTUnwrap(URL(string: "ssh://host:99999"))
+
+        switch SSHStandardURLRequest.parse(url) {
+        case .failure(.invalidPort):
+            break
+        default:
+            XCTFail("Expected invalid standard SSH port rejection")
+        }
+    }
+
+    func testCmuxSchemeStillParsesSSHURLRegressionGuard() throws {
+        var components = URLComponents()
+        components.scheme = supportedScheme
+        components.host = "ssh"
+        components.queryItems = [
+            URLQueryItem(name: "host", value: "dev.example.com")
+        ]
+        let url = try XCTUnwrap(components.url)
+
+        switch CmuxSSHURLRequest.parse(url) {
+        case .success(.some(let request)):
+            XCTAssertEqual(request.destination, "dev.example.com")
+            XCTAssertEqual(request.cliArguments, ["ssh", "dev.example.com"])
+        case .success(nil):
+            XCTFail("Expected SSH URL request")
+        case .failure(let error):
+            XCTFail("Unexpected parse error: \(error)")
+        }
+    }
+
     func testParsesSSHURLWithFreestyleUserDelimiters() throws {
         let cases = [
             "workspace123,session-token_ABC.2yi9kzY-dysFsVBKh",

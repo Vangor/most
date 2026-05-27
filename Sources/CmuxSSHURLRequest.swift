@@ -30,8 +30,27 @@ struct CmuxSSHURLRequest: Equatable {
     let destination: String
     let port: Int?
     let title: String?
+    let workingDirectory: String?
     let sshOptions: [String]
     let noFocus: Bool
+
+    init(
+        originalURL: URL,
+        destination: String,
+        port: Int?,
+        title: String?,
+        workingDirectory: String? = nil,
+        sshOptions: [String],
+        noFocus: Bool
+    ) {
+        self.originalURL = originalURL
+        self.destination = destination
+        self.port = port
+        self.title = title
+        self.workingDirectory = workingDirectory
+        self.sshOptions = sshOptions
+        self.noFocus = noFocus
+    }
 
     var cliArguments: [String] {
         var parts = ["ssh"]
@@ -191,6 +210,7 @@ struct CmuxSSHURLRequest: Equatable {
                 destination: destination,
                 port: parsedPort,
                 title: title,
+                workingDirectory: nil,
                 sshOptions: sshOptions,
                 noFocus: noFocus
             )
