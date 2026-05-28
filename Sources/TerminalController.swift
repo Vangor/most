@@ -19570,8 +19570,18 @@ class TerminalController {
             if let panelId = panelResolution.panelId, !tab.panels.keys.contains(panelId) {
                 return
             }
+            let claudeNotification = tab.claudeStatusNotification(fromLifecycleKey: key, lifecycle: lifecycle)
             tab.setAgentLifecycle(key: key, panelId: panelResolution.panelId, lifecycle: lifecycle)
             tab.syncClaudeStatusBadge(fromLifecycleKey: key, lifecycle: lifecycle)
+            if let claudeNotification {
+                TerminalNotificationStore.shared.addClaudeStatusNotification(
+                    tabId: tab.id,
+                    surfaceId: panelResolution.panelId,
+                    title: claudeNotification.title,
+                    body: claudeNotification.body,
+                    state: claudeNotification.state
+                )
+            }
         }
         return "OK"
     }

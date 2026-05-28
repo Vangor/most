@@ -122,6 +122,12 @@ struct WorkspaceClaudeStatusBadge: Equatable {
     }
 }
 
+struct WorkspaceClaudeStatusNotification: Equatable {
+    let state: WorkspaceClaudeStatusBadge.State
+    let title: String
+    let body: String
+}
+
 struct SidebarMetadataBlock: Equatable {
     let key: String
     let markdown: String

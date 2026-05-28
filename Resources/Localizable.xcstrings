@@ -63723,6 +63723,40 @@
         }
       }
     },
+    "settings.notifications.claudeStatus": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Status Notifications"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claudeのステータス通知"
+          }
+        }
+      }
+    },
+    "settings.notifications.claudeStatus.subtitle": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show desktop alerts for Claude needs-input and completion transitions."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude が入力を必要としたときや完了したときにデスクトップ通知を表示します。"
+          }
+        }
+      }
+    },
     "settings.notifications.command": {
       "extractionState": "manual",
       "localizations": {
@@ -108687,6 +108721,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "Робоча область"
+          }
+        }
+      }
+    },
+    "claude.notification.body.waiting": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude needs your input."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude に入力が必要です。"
+          }
+        }
+      }
+    },
+    "claude.notification.body.idle": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude finished this turn."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude のこのターンは完了しました。"
           }
         }
       }

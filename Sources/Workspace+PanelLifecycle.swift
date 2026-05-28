@@ -212,9 +212,56 @@ extension Workspace {
         claudeStatusBadge = WorkspaceClaudeStatusBadge.status(from: lifecycle, previous: claudeStatusBadge)
     }
 
+    func claudeStatusNotification(fromLifecycleKey key: String, lifecycle: AgentHibernationLifecycleState) -> WorkspaceClaudeStatusNotification? {
+        guard key == Self.claudeCodeStatusKey else { return nil }
+        let previous = claudeStatusBadge
+        let next = WorkspaceClaudeStatusBadge.status(from: lifecycle, previous: previous)
+        guard let next else { return nil }
+        guard previous?.state != next.state else { return nil }
+
+        let body = claudeNotificationBody(for: next.state)
+        guard !body.isEmpty else { return nil }
+
+        return WorkspaceClaudeStatusNotification(
+            state: next.state,
+            title: claudeNotificationTitle,
+            body: body
+        )
+    }
+
     func clearClaudeStatusBadge(forStatusKey key: String) {
         guard key == Self.claudeCodeStatusKey else { return }
         claudeStatusBadge = nil
+    }
+
+    var claudeNotificationTitle: String {
+        let workspaceName = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let fallbackName = workspaceName.isEmpty
+            ? String(localized: "workspace.displayName.fallback", defaultValue: "Workspace")
+            : workspaceName
+        let directory = currentDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !directory.isEmpty else { return fallbackName }
+        return "\(fallbackName) — \(directory)"
+    }
+
+    func claudeNotificationBody(for state: WorkspaceClaudeStatusBadge.State) -> String {
+        if let value = statusEntries[Self.claudeCodeStatusKey]?.value
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+           !value.isEmpty {
+            return value
+                .replacingOccurrences(of: "\r", with: " ")
+                .replacingOccurrences(of: "\n", with: " ")
+                .replacingOccurrences(of: "\t", with: " ")
+        }
+
+        switch state {
+        case .waiting:
+            return String(localized: "claude.notification.body.waiting", defaultValue: "Claude needs your input.")
+        case .idle:
+            return String(localized: "claude.notification.body.idle", defaultValue: "Claude finished this turn.")
+        case .busy, .shell:
+            return ""
+        }
     }
 
     private func isStructuredAgentHookPIDKey(_ key: String) -> Bool {
