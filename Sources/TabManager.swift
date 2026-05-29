@@ -2325,6 +2325,12 @@ class TabManager: ObservableObject {
               let directory = gitProbeDirectory(for: workspace, panelId: panelId) else {
             return
         }
+        // Remote workspaces report git state via shell-integration's report_git_branch.
+        // Running a local git probe against a remote path (which doesn't exist on the
+        // macOS filesystem) always returns branch=none and then clears the
+        // shell-reported branch via clearPanelGitBranch.  Skip the probe entirely for
+        // remote workspaces; the shell-side reporter is the authoritative source there.
+        guard !workspace.isRemoteWorkspace else { return }
 
         scheduleWorkspaceGitMetadataRefresh(
             workspaceId: workspaceId,

@@ -15307,7 +15307,12 @@ private struct TabItemView: View, Equatable {
             let directoryCandidates: [String] = {
                 guard let directory = entry.directory else { return [] }
                 if useViewportAwarePath {
-                    return SidebarPathFormatter.pathCandidates(directory, homeDirectoryPath: home)
+                    // sidebarPathLastSegmentOnly=true: show only the basename so the
+                    // pill always reads "lingualex" not "~/Git/lingualex".
+                    // pathCandidates would give ViewThatFits a full-path option that it
+                    // picks whenever the row is wide enough, defeating the setting.
+                    let last = SidebarPathFormatter.lastSegmentPath(directory, homeDirectoryPath: home)
+                    return last.isEmpty ? [] : [last]
                 }
                 let shortened = SidebarPathFormatter.shortenedPath(directory, homeDirectoryPath: home)
                 return shortened.isEmpty ? [] : [shortened]
@@ -15345,27 +15350,14 @@ private struct TabItemView: View, Equatable {
             return joined.isEmpty ? [] : [joined]
         }
 
-        let perDirectoryCandidates: [[String]] = directories
-            .map { SidebarPathFormatter.pathCandidates($0, homeDirectoryPath: home) }
+        // sidebarPathLastSegmentOnly=true: show only the basename for each panel,
+        // joined with " | ".  A single fixed string is correct here — no gradient of
+        // candidates needed because the display width is not the deciding factor.
+        let joined = directories
+            .map { SidebarPathFormatter.lastSegmentPath($0, homeDirectoryPath: home) }
             .filter { !$0.isEmpty }
-        guard !perDirectoryCandidates.isEmpty else { return [] }
-
-        var indices = Array(repeating: 0, count: perDirectoryCandidates.count)
-        var result: [String] = []
-        while true {
-            let pieces = zip(indices, perDirectoryCandidates).map { idx, candidates in
-                candidates[idx]
-            }
-            let joined = pieces.joined(separator: " | ")
-            if !joined.isEmpty, result.last != joined {
-                result.append(joined)
-            }
-            guard let bumpIdx = indices.indices.last(where: { indices[$0] < perDirectoryCandidates[$0].count - 1 }) else {
-                break
-            }
-            indices[bumpIdx] += 1
-        }
-        return result
+            .joined(separator: " | ")
+        return joined.isEmpty ? [] : [joined]
     }
 
     private func pullRequestDisplays(orderedPanelIds: [UUID]) -> [SidebarWorkspaceSnapshotBuilder.PullRequestDisplay] {
