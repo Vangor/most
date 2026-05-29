@@ -14109,32 +14109,24 @@ private struct TabItemView: View, Equatable {
     private var remoteWorkspaceSection: some View {
         let workspaceSnapshot = self.workspaceSnapshot
         if !settings.hidesAllDetails, sidebarShowSSH, let remoteWorkspaceSidebarText = workspaceSnapshot.remoteWorkspaceSidebarText {
-            // Compact SSH presence indicator: SF Symbol `network`/`network.slash`
-            // tinted by connection state, replacing the longer "Connected" /
-            // "Reconnecting" text. Hostname stays on the left; the icon
-            // signals on/off + health at a glance.
+            // Compact SSH presence indicator: a tiny filled circle whose
+            // color encodes connection state. Bright white when connected
+            // (very visible against the dark sidebar); dimmed when
+            // disconnected; warm when in-progress; red on error.
             let state = tab.remoteConnectionState
-            let symbolName: String = {
+            let dotColor: Color = {
                 switch state {
-                case .connected, .connecting, .reconnecting:
-                    return "network"
-                case .disconnected, .error:
-                    return "network.slash"
-                }
-            }()
-            let symbolColor: Color = {
-                switch state {
-                case .connected: return Color(red: 0.46, green: 0.78, blue: 1.0)
+                case .connected: return Color.white
                 case .connecting, .reconnecting: return Color(red: 1.0, green: 0.82, blue: 0.35)
                 case .error: return Color(red: 1.0, green: 0.45, blue: 0.45)
-                case .disconnected: return Color.white.opacity(0.55)
+                case .disconnected: return Color.white.opacity(0.35)
                 }
             }()
             VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 4) {
-                    Image(systemName: symbolName)
-                        .font(.system(size: 9, weight: .semibold))
-                        .foregroundColor(symbolColor)
+                HStack(spacing: 5) {
+                    Circle()
+                        .fill(dotColor)
+                        .frame(width: 6, height: 6)
                         .accessibilityLabel(workspaceSnapshot.remoteConnectionStatusText)
                     Text(remoteWorkspaceSidebarText)
                         .font(.system(size: 10, design: .monospaced))
