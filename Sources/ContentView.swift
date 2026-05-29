@@ -14197,9 +14197,14 @@ private struct TabItemView: View, Equatable {
                         case .disconnected: return Color.white.opacity(0.35)
                         }
                     }()
+                    // Embed the dot inside a text-baseline-sized frame so
+                    // HStack's default centeredAlignment lines the circle up
+                    // with the workspace title's optical center instead of
+                    // sitting on top of the line.
                     Circle()
                         .fill(sshDotColor)
                         .frame(width: 6, height: 6)
+                        .frame(height: 14, alignment: .center)
                         .accessibilityLabel(workspaceSnapshot.remoteConnectionStatusText)
                         .safeHelp(workspaceSnapshot.remoteStateHelpText ?? workspaceSnapshot.remoteConnectionStatusText)
                 }

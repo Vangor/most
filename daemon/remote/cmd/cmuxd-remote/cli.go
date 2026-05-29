@@ -371,17 +371,24 @@ func runClaudeHookRelay(socketPath, cmdName string, cmdArgs []string, refreshAdd
 	// Capture only the env keys runClaudeHook actually consults. We don't
 	// forward the whole environment because it would override the Mac
 	// app's own runtime env.
+	//
+	// CMUX_CLAUDE_PID and CMUX_CLAUDE_HOOK_CMUX_BIN are deliberately NOT
+	// forwarded: the PID belongs to the remote (sreda) process tree, so
+	// the Mac-side stale-session detector that runs `kill -0` on the
+	// recorded PID would always conclude the process is dead and clear
+	// the sidebar pill after a few seconds. The HOOK_CMUX_BIN env points
+	// at the remote shim which would never resolve to a real binary on
+	// the Mac. Both are safe to omit — runClaudeHook treats their
+	// absence as "no PID/wrapper context" and skips the stale check.
 	envKeys := []string{
 		"CMUX_WORKSPACE_ID",
 		"CMUX_TAB_ID",
 		"CMUX_SURFACE_ID",
 		"CMUX_PANEL_ID",
-		"CMUX_CLAUDE_PID",
 		"CMUX_AGENT_LAUNCH_KIND",
 		"CMUX_AGENT_LAUNCH_EXECUTABLE",
 		"CMUX_AGENT_LAUNCH_ARGV_B64",
 		"CMUX_AGENT_LAUNCH_CWD",
-		"CMUX_CLAUDE_HOOK_CMUX_BIN",
 		"CMUX_CLAUDE_HOOKS_DISABLED",
 		"CLAUDECODE",
 		"CLAUDE_PROJECT_DIR",
