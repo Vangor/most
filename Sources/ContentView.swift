@@ -14109,20 +14109,39 @@ private struct TabItemView: View, Equatable {
     private var remoteWorkspaceSection: some View {
         let workspaceSnapshot = self.workspaceSnapshot
         if !settings.hidesAllDetails, sidebarShowSSH, let remoteWorkspaceSidebarText = workspaceSnapshot.remoteWorkspaceSidebarText {
+            // Compact SSH presence indicator: SF Symbol `network`/`network.slash`
+            // tinted by connection state, replacing the longer "Connected" /
+            // "Reconnecting" text. Hostname stays on the left; the icon
+            // signals on/off + health at a glance.
+            let state = tab.remoteConnectionState
+            let symbolName: String = {
+                switch state {
+                case .connected, .connecting, .reconnecting:
+                    return "network"
+                case .disconnected, .error:
+                    return "network.slash"
+                }
+            }()
+            let symbolColor: Color = {
+                switch state {
+                case .connected: return Color.green.opacity(0.85)
+                case .connecting, .reconnecting: return Color.orange.opacity(0.85)
+                case .error: return Color.red.opacity(0.85)
+                case .disconnected: return activeSecondaryColor(0.55)
+                }
+            }()
             VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
+                HStack(spacing: 4) {
+                    Image(systemName: symbolName)
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundColor(symbolColor)
+                        .accessibilityLabel(workspaceSnapshot.remoteConnectionStatusText)
                     Text(remoteWorkspaceSidebarText)
                         .font(.system(size: 10, design: .monospaced))
                         .foregroundColor(activeSecondaryColor(0.8))
                         .lineLimit(1)
                         .truncationMode(.middle)
-
                     Spacer(minLength: 0)
-
-                    Text(workspaceSnapshot.remoteConnectionStatusText)
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundColor(activeSecondaryColor(0.58))
-                        .lineLimit(1)
                 }
             }
             .padding(.top, latestNotificationText == nil ? 1 : 2)

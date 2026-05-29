@@ -698,10 +698,14 @@ enum MenuBarIconRenderer {
         drawGlyph(in: glyphRect)
 
         if let text = badgeText {
-            drawBadge(text: text, in: config.badgeRect, config: config)
+            drawCircleBadge(text: text, in: config.badgeRect, config: config)
         }
 
-        image.isTemplate = true
+        // Template rendering tints the entire image to match the menubar
+        // appearance — fine for the plain glyph, but it would swallow the
+        // colored circle + white number badge. Switch to non-template when
+        // there's a badge to draw so the blue/white survives.
+        image.isTemplate = (badgeText == nil)
         return image
     }
 
@@ -749,6 +753,36 @@ enum MenuBarIconRenderer {
 
         NSColor.black.setFill()
         path.fill()
+    }
+
+    private static func drawCircleBadge(text: String, in rect: NSRect, config: MenuBarBadgeRenderConfig) {
+        // Filled blue circle (slightly inflated to host single- and multi-
+        // digit text comfortably), then white digits on top.
+        let inflation: CGFloat = 1.0
+        let circleRect = rect.insetBy(dx: -inflation, dy: -inflation)
+        let circle = NSBezierPath(ovalIn: circleRect)
+        NSColor.systemBlue.setFill()
+        circle.fill()
+
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.alignment = .center
+        let fontSize: CGFloat = text.count > 1
+            ? max(config.multiDigitFontSize - 0.5, 6.0)
+            : max(config.singleDigitFontSize - 0.5, 7.0)
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: fontSize, weight: .bold),
+            .foregroundColor: NSColor.white,
+            .paragraphStyle: paragraph,
+        ]
+        let attributed = NSAttributedString(string: text, attributes: attrs)
+        let textSize = attributed.size()
+        let textRect = NSRect(
+            x: circleRect.midX - textSize.width / 2.0,
+            y: circleRect.midY - textSize.height / 2.0,
+            width: textSize.width,
+            height: textSize.height
+        )
+        attributed.draw(in: textRect)
     }
 
     private static func drawBadge(text: String, in rect: NSRect, config: MenuBarBadgeRenderConfig) {
