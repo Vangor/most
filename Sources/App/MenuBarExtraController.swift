@@ -694,10 +694,13 @@ enum MenuBarIconRenderer {
         image.lockFocus()
         defer { image.unlockFocus() }
 
-        // Use the full image bounds for the glyph — the bundled MenubarIcon
-        // asset already includes its own visual padding, so additional inset
-        // shrinks the silhouette further than necessary.
-        let glyphRect = NSRect(x: 0, y: 0, width: size.width, height: size.height)
+        // Use the full image bounds for the glyph, then nudge ~1pt right and
+        // ~1pt down to match the optical balance of the neighboring system
+        // menubar icons (Wi-Fi, Bluetooth, Battery), which sit slightly low-
+        // and right- of dead-center on a 16-18pt status item. lockFocus uses
+        // bottom-left origin coordinates so reducing y shifts the glyph down
+        // visually.
+        let glyphRect = NSRect(x: 0.8, y: -0.8, width: size.width, height: size.height)
         drawGlyph(in: glyphRect)
 
         if let text = badgeText {

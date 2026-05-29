@@ -14179,6 +14179,14 @@ private struct TabItemView: View, Equatable {
                         .safeHelp(protectedWorkspaceTooltip)
                 }
 
+                Text(workspaceSnapshot.title)
+                    .font(.system(size: 12.5, weight: titleFontWeight))
+                    .foregroundColor(activePrimaryTextColor)
+                    .lineLimit(settings.wrapsWorkspaceTitles ? nil : 1)
+                    .truncationMode(.tail)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .layoutPriority(1)
+
                 if sidebarShowSSH, workspaceSnapshot.remoteWorkspaceSidebarText != nil {
                     let sshState = tab.remoteConnectionState
                     let sshDotColor: Color = {
@@ -14196,14 +14204,7 @@ private struct TabItemView: View, Equatable {
                         .safeHelp(workspaceSnapshot.remoteStateHelpText ?? workspaceSnapshot.remoteConnectionStatusText)
                 }
 
-                Text(workspaceSnapshot.title)
-                    .font(.system(size: 12.5, weight: titleFontWeight))
-                    .foregroundColor(activePrimaryTextColor)
-                    .lineLimit(settings.wrapsWorkspaceTitles ? nil : 1)
-                    .truncationMode(.tail)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .layoutPriority(1)
+                Spacer(minLength: 0)
 
                 if let claudeStatusBadge = workspaceSnapshot.claudeStatusBadge {
                     SidebarClaudeStatusBadgeView(
