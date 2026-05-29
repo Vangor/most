@@ -694,7 +694,10 @@ enum MenuBarIconRenderer {
         image.lockFocus()
         defer { image.unlockFocus() }
 
-        let glyphRect = NSRect(x: 0.5, y: 0.5, width: 17.0, height: 17.0)
+        // Use the full image bounds for the glyph — the bundled MenubarIcon
+        // asset already includes its own visual padding, so additional inset
+        // shrinks the silhouette further than necessary.
+        let glyphRect = NSRect(x: 0, y: 0, width: size.width, height: size.height)
         drawGlyph(in: glyphRect)
 
         if let text = badgeText {

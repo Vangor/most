@@ -14124,10 +14124,10 @@ private struct TabItemView: View, Equatable {
             }()
             let symbolColor: Color = {
                 switch state {
-                case .connected: return Color.green.opacity(0.85)
-                case .connecting, .reconnecting: return Color.orange.opacity(0.85)
-                case .error: return Color.red.opacity(0.85)
-                case .disconnected: return activeSecondaryColor(0.55)
+                case .connected: return Color(red: 0.46, green: 0.78, blue: 1.0)
+                case .connecting, .reconnecting: return Color(red: 1.0, green: 0.82, blue: 0.35)
+                case .error: return Color(red: 1.0, green: 0.45, blue: 0.45)
+                case .disconnected: return Color.white.opacity(0.55)
                 }
             }()
             VStack(alignment: .leading, spacing: 2) {
