@@ -10318,8 +10318,20 @@ class TerminalController {
         }
 
         var env = ProcessInfo.processInfo.environment
+        // Strip any inherited socket path that might point at a different app
+        // instance (e.g. production cmux.app's socket inherited from the shell
+        // that launched this app). The hook subprocess must talk back to THIS
+        // app's own listener, not whatever CMUX_SOCKET_PATH the process tree
+        // happened to inherit. activeSocketPath returns the actually-bound path
+        // (snapshot.socketPath when the listener is running), falling back to
+        // the configured preferred path if the listener hasn't started yet.
+        env.removeValue(forKey: "CMUX_SOCKET")
+        env.removeValue(forKey: "CMUX_SOCKET_PATH")
+        env["CMUX_SOCKET_PATH"] = activeSocketPath(preferredPath: socketPath)
         // Remote-workspace identity overrides take precedence so runClaudeHook
         // sees the remote workspace context, not the app's own ambient env.
+        // (envOverrides never contains a socket path, so the explicit binding
+        // above is preserved.)
         for (key, value) in envOverrides where !value.isEmpty {
             env[key] = value
         }
