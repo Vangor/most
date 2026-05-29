@@ -14107,38 +14107,10 @@ private struct TabItemView: View, Equatable {
 
     @ViewBuilder
     private var remoteWorkspaceSection: some View {
-        let workspaceSnapshot = self.workspaceSnapshot
-        if !settings.hidesAllDetails, sidebarShowSSH, let remoteWorkspaceSidebarText = workspaceSnapshot.remoteWorkspaceSidebarText {
-            // Compact SSH presence indicator: a tiny filled circle whose
-            // color encodes connection state. Bright white when connected
-            // (very visible against the dark sidebar); dimmed when
-            // disconnected; warm when in-progress; red on error.
-            let state = tab.remoteConnectionState
-            let dotColor: Color = {
-                switch state {
-                case .connected: return Color.white
-                case .connecting, .reconnecting: return Color(red: 1.0, green: 0.82, blue: 0.35)
-                case .error: return Color(red: 1.0, green: 0.45, blue: 0.45)
-                case .disconnected: return Color.white.opacity(0.35)
-                }
-            }()
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 5) {
-                    Circle()
-                        .fill(dotColor)
-                        .frame(width: 6, height: 6)
-                        .accessibilityLabel(workspaceSnapshot.remoteConnectionStatusText)
-                    Text(remoteWorkspaceSidebarText)
-                        .font(.system(size: 10, design: .monospaced))
-                        .foregroundColor(activeSecondaryColor(0.8))
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                    Spacer(minLength: 0)
-                }
-            }
-            .padding(.top, latestNotificationText == nil ? 1 : 2)
-            .safeHelp(workspaceSnapshot.remoteStateHelpText)
-        }
+        // The remote SSH indicator now lives next to the workspace title as a
+        // compact colored dot — the hostname text + status row was redundant
+        // once the title-row dot conveyed the same information at a glance.
+        EmptyView()
     }
 
     private func copyWorkspaceIdsToPasteboard(_ ids: [UUID], includeRefs: Bool = false) {
@@ -14205,6 +14177,23 @@ private struct TabItemView: View, Equatable {
                         .font(.system(size: 9, weight: .semibold))
                         .foregroundColor(activeSecondaryColor(0.8))
                         .safeHelp(protectedWorkspaceTooltip)
+                }
+
+                if sidebarShowSSH, workspaceSnapshot.remoteWorkspaceSidebarText != nil {
+                    let sshState = tab.remoteConnectionState
+                    let sshDotColor: Color = {
+                        switch sshState {
+                        case .connected: return Color.white
+                        case .connecting, .reconnecting: return Color(red: 1.0, green: 0.82, blue: 0.35)
+                        case .error: return Color(red: 1.0, green: 0.45, blue: 0.45)
+                        case .disconnected: return Color.white.opacity(0.35)
+                        }
+                    }()
+                    Circle()
+                        .fill(sshDotColor)
+                        .frame(width: 6, height: 6)
+                        .accessibilityLabel(workspaceSnapshot.remoteConnectionStatusText)
+                        .safeHelp(workspaceSnapshot.remoteStateHelpText ?? workspaceSnapshot.remoteConnectionStatusText)
                 }
 
                 Text(workspaceSnapshot.title)
