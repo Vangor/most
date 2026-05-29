@@ -296,7 +296,7 @@ struct SocketControlSettings {
     static let allowSocketPathOverrideKey = "CMUX_ALLOW_SOCKET_OVERRIDE"
     static let socketPasswordEnvKey = "CMUX_SOCKET_PASSWORD"
     static let launchTagEnvKey = "CMUX_TAG"
-    static let baseDebugBundleIdentifier = "com.cmuxterm.app.debug"
+    static let baseDebugBundleIdentifier = "com.4etverg.most.debug"
     private static let socketDirectoryName = "cmux"
     private static let stableSocketFileName = "cmux.sock"
     static let legacyStableDefaultSocketPath = "/tmp/cmux.sock"
@@ -468,7 +468,7 @@ struct SocketControlSettings {
         stableDefaultSocketCanBeReclaimed: (String) -> Bool = { _ in true }
     ) -> String {
         guard !isDebugBuild,
-              normalizedBundleIdentifier(bundleIdentifier) == "com.cmuxterm.app",
+              normalizedBundleIdentifier(bundleIdentifier) == "com.4etverg.most",
               isStableReleaseSocketPath(preferredPath, currentUserID: currentUserID) else {
             return preferredPath
         }
@@ -579,7 +579,7 @@ struct SocketControlSettings {
 
     private static func shouldReserveStableSocketPath(bundleIdentifier: String?, isDebugBuild: Bool) -> Bool {
         if isDebugBuild { return true }
-        return normalizedBundleIdentifier(bundleIdentifier) != "com.cmuxterm.app"
+        return normalizedBundleIdentifier(bundleIdentifier) != "com.4etverg.most"
     }
 
     private static func isStableReleaseSocketPath(_ path: String, currentUserID: uid_t) -> Bool {
@@ -677,19 +677,19 @@ struct SocketControlSettings {
 
     static func isDebugLikeBundleIdentifier(_ bundleIdentifier: String?) -> Bool {
         guard let bundleIdentifier else { return false }
-        return bundleIdentifier == "com.cmuxterm.app.debug"
-            || bundleIdentifier.hasPrefix("com.cmuxterm.app.debug.")
+        return bundleIdentifier == "com.4etverg.most.debug"
+            || bundleIdentifier.hasPrefix("com.4etverg.most.debug.")
     }
 
-    /// Tagged DEV builds have bundle IDs like `com.cmuxterm.app.debug.<tag>`.
+    /// Tagged DEV builds have bundle IDs like `com.4etverg.most.debug.<tag>`.
     static func isTaggedDevBuild(bundleIdentifier: String? = Bundle.main.bundleIdentifier) -> Bool {
         guard let bundleIdentifier else { return false }
         return bundleIdentifier.hasPrefix("\(baseDebugBundleIdentifier).")
     }
     static func isStagingBundleIdentifier(_ bundleIdentifier: String?) -> Bool {
         guard let bundleIdentifier else { return false }
-        return bundleIdentifier == "com.cmuxterm.app.staging"
-            || bundleIdentifier.hasPrefix("com.cmuxterm.app.staging.")
+        return bundleIdentifier == "com.4etverg.most.staging"
+            || bundleIdentifier.hasPrefix("com.4etverg.most.staging.")
     }
 
     static func stableSocketDirectoryURL(fileManager: FileManager = .default) -> URL? {

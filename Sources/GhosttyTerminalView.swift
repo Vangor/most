@@ -1682,7 +1682,7 @@ class GhosttyApp {
     }
 
     static let shared = GhosttyApp()
-    private static let releaseBundleIdentifier = "com.cmuxterm.app"
+    private static let releaseBundleIdentifier = "com.4etverg.most"
     private static let fallbackAppearanceConfig = GhosttyConfig()
     private static let initializationLogger = Logger(
         subsystem: releaseBundleIdentifier,

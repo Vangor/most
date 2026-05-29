@@ -483,9 +483,9 @@ enum CLISocketPathResolver {
         }
 
 #if DEBUG
-        return "com.cmuxterm.app.debug"
+        return "com.4etverg.most.debug"
 #else
-        return "com.cmuxterm.app"
+        return "com.4etverg.most"
 #endif
     }
 

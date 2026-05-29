@@ -66,10 +66,10 @@ enum StartupBreadcrumbLog {
             return true
         }
         let bundleIdentifier = Bundle.main.bundleIdentifier ?? ""
-        return bundleIdentifier == "com.cmuxterm.app.nightly"
-            || bundleIdentifier.hasPrefix("com.cmuxterm.app.nightly.")
-            || bundleIdentifier == "com.cmuxterm.app.debug"
-            || bundleIdentifier.hasPrefix("com.cmuxterm.app.debug.")
+        return bundleIdentifier == "com.4etverg.most.nightly"
+            || bundleIdentifier.hasPrefix("com.4etverg.most.nightly.")
+            || bundleIdentifier == "com.4etverg.most.debug"
+            || bundleIdentifier.hasPrefix("com.4etverg.most.debug.")
     }
 
     private static var logURL: URL {

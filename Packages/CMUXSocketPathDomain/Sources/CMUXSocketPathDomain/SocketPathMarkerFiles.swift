@@ -59,9 +59,9 @@ public enum SocketPathVariant: Equatable {
 public enum SocketPathMarkerFiles {
     public static let stableAppSupportFileName = "last-socket-path"
     public static let stableTmpPath = "/tmp/cmux-last-socket-path"
-    public static let nightlyBundleIdentifier = "com.cmuxterm.app.nightly"
-    public static let stagingBundleIdentifier = "com.cmuxterm.app.staging"
-    public static let defaultBaseDebugBundleIdentifier = "com.cmuxterm.app.debug"
+    public static let nightlyBundleIdentifier = "com.4etverg.most.nightly"
+    public static let stagingBundleIdentifier = "com.4etverg.most.staging"
+    public static let defaultBaseDebugBundleIdentifier = "com.4etverg.most.debug"
     public static let defaultDebugSocketPath = "/tmp/cmux-debug.sock"
     public static let defaultNightlySocketPath = "/tmp/cmux-nightly.sock"
     public static let defaultStagingSocketPath = "/tmp/cmux-staging.sock"

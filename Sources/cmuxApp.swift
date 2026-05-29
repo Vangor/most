@@ -4736,8 +4736,8 @@ nonisolated enum BuildFlavor: String, Sendable {
         if SocketControlSettings.isDebugLikeBundleIdentifier(normalizedBundleIdentifier) {
             return .dev
         }
-        if normalizedBundleIdentifier == "com.cmuxterm.app.nightly"
-            || normalizedBundleIdentifier?.hasPrefix("com.cmuxterm.app.nightly.") == true {
+        if normalizedBundleIdentifier == "com.4etverg.most.nightly"
+            || normalizedBundleIdentifier?.hasPrefix("com.4etverg.most.nightly.") == true {
             return .nightly
         }
         if bundleNames.contains(where: containsNightlyToken) {
