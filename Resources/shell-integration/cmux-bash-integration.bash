@@ -15,6 +15,16 @@ _cmux_detect_send_tool() {
 
 _cmux_send() {
     local payload="$1"
+    # Route through cmuxd-remote `__v1` passthrough for TCP-relay sockets
+    # (remote workspaces). The ncat/socat/nc -U paths only work for
+    # Unix-domain sockets.
+    if [[ -n "$CMUX_SOCKET_PATH" && "$CMUX_SOCKET_PATH" != /* && "$CMUX_SOCKET_PATH" == *:* ]]; then
+        local relay_cli
+        relay_cli="$(_cmux_relay_cli_path)" || return 1
+        [[ -n "$relay_cli" ]] || return 1
+        "$relay_cli" __v1 "$payload" >/dev/null 2>&1
+        return $?
+    fi
     case "$_CMUX_SEND_TOOL" in
         ncat)
             printf '%s\n' "$payload" | ncat -w 1 -U "$CMUX_SOCKET_PATH" --send-only

@@ -210,6 +210,24 @@ doneFlags:
 		return runTmuxCompat(socketPath, cmdArgs, refreshAddr)
 	}
 
+	// Raw v1 passthrough used by the shell-integration script's _cmux_send
+	// when the socket is a TCP relay (host:port) instead of a Unix domain
+	// socket file. The shell integration's direct zsocket/ncat -U paths
+	// only work for Unix sockets, so on remote workspaces it falls back
+	// to invoking this subcommand. The payload is everything after `__v1`
+	// joined by single spaces, sent as one line on the relay.
+	if cmdName == "__v1" {
+		payload := strings.Join(cmdArgs, " ")
+		if payload == "" {
+			return 0
+		}
+		if _, err := socketRoundTrip(socketPath, payload, refreshAddr); err != nil {
+			fmt.Fprintf(os.Stderr, "cmux __v1: %v\n", err)
+			return 1
+		}
+		return 0
+	}
+
 	// Claude wrapper hook subcommands. The Mac-side `cmux hooks claude <event>`
 	// (and the legacy `cmux claude-hook <event>`) implement sidebar
 	// status/pills/feed telemetry by talking to the local cmux app socket.

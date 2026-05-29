@@ -11,6 +11,18 @@ fi
 
 _cmux_send() {
     local payload="$1"
+    # Remote workspaces have CMUX_SOCKET_PATH=host:port (TCP relay).
+    # zsocket and the ncat/socat/nc -U paths below only handle Unix-domain
+    # sockets, so for the TCP form route through the cmuxd-remote
+    # `__v1` passthrough which writes the payload to the Mac socket via
+    # the established relay connection.
+    if [[ -n "$CMUX_SOCKET_PATH" && "$CMUX_SOCKET_PATH" != /* && "$CMUX_SOCKET_PATH" == *:* ]]; then
+        local relay_cli
+        relay_cli="$(_cmux_relay_cli_path)" || return 1
+        [[ -n "$relay_cli" ]] || return 1
+        "$relay_cli" __v1 "$payload" >/dev/null 2>&1
+        return $?
+    fi
     if (( _CMUX_HAS_ZSOCKET )); then
         local fd
         zsocket "$CMUX_SOCKET_PATH" 2>/dev/null || return 1
