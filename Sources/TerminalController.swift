@@ -10288,6 +10288,14 @@ class TerminalController {
     // this method, and the Mac side spawns the bundled cmux CLI as a
     // subprocess with that exact stdin/env. The subprocess uses its own
     // local socket round-trip to update workspace state.
+    //
+    // The handler returns success the moment the subprocess is launched —
+    // it does NOT wait for it. The spawned cmux makes its own RPCs back into
+    // this same daemon (set_agent_pid, surface.resume.set, feed.push, …) so
+    // blocking the v2 dispatch thread on subprocess exit would deadlock
+    // against the daemon's own queue. Hook events are advisory state
+    // updates; the wrapper's HOOKS_JSON already sets per-event timeouts on
+    // Claude's side, so fire-and-forget is the right policy here.
     private func v2ClaudeHookRelay(params: [String: Any]) -> V2CallResult {
         guard let argv = params["argv"] as? [String], !argv.isEmpty else {
             return .err(code: "invalid_params", message: "argv required", data: nil)
@@ -10316,40 +10324,49 @@ class TerminalController {
             env[key] = value
         }
 
-        let process = Process()
-        process.executableURL = cmuxURL
-        process.arguments = argv
-        process.environment = env
-        let stdinPipe = Pipe()
-        let stdoutPipe = Pipe()
-        let stderrPipe = Pipe()
-        process.standardInput = stdinPipe
-        process.standardOutput = stdoutPipe
-        process.standardError = stderrPipe
+        // Dispatch the subprocess on a background queue so the v2 dispatcher
+        // thread can keep servicing the daemon socket — including the RPCs
+        // this very subprocess is about to issue.
+        DispatchQueue.global(qos: .utility).async {
+            let process = Process()
+            process.executableURL = cmuxURL
+            process.arguments = argv
+            process.environment = env
+            let stdinPipe = Pipe()
+            let stdoutPipe = Pipe()
+            let stderrPipe = Pipe()
+            process.standardInput = stdinPipe
+            process.standardOutput = stdoutPipe
+            process.standardError = stderrPipe
 
-        do {
-            try process.run()
-        } catch {
-            return .err(
-                code: "spawn_failed",
-                message: "failed to spawn cmux: \(error.localizedDescription)",
-                data: nil
-            )
+            do {
+                try process.run()
+            } catch {
+                NSLog("[claude_hook.relay] failed to spawn cmux: \(error)")
+                return
+            }
+
+            if !stdinData.isEmpty {
+                try? stdinPipe.fileHandleForWriting.write(contentsOf: stdinData)
+            }
+            try? stdinPipe.fileHandleForWriting.close()
+
+            // Drain output asynchronously so the subprocess can't stall on a
+            // full pipe buffer while we wait for it.
+            DispatchQueue.global(qos: .utility).async {
+                _ = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
+            }
+            DispatchQueue.global(qos: .utility).async {
+                _ = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+            }
+            process.waitUntilExit()
         }
-
-        if !stdinData.isEmpty {
-            try? stdinPipe.fileHandleForWriting.write(contentsOf: stdinData)
-        }
-        try? stdinPipe.fileHandleForWriting.close()
-
-        let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
-        let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
 
         return .ok([
-            "exit_code": Int(process.terminationStatus),
-            "stdout": String(data: stdoutData, encoding: .utf8) ?? "",
-            "stderr": String(data: stderrData, encoding: .utf8) ?? "",
+            "exit_code": 0,
+            "stdout": "",
+            "stderr": "",
+            "dispatched": true,
         ])
     }
 

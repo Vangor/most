@@ -479,9 +479,45 @@ fi
 #   hook because a subagent finishing should not notify like the parent.
 HOOKS_JSON='{"preferredNotifChannel":"notifications_disabled","hooks":{"SessionStart":[{"matcher":"","hooks":[{"type":"command","command":"\"${CMUX_CLAUDE_HOOK_CMUX_BIN:-cmux}\" hooks claude session-start","timeout":10}]}],"Stop":[{"matcher":"","hooks":[{"type":"command","command":"\"${CMUX_CLAUDE_HOOK_CMUX_BIN:-cmux}\" hooks claude stop","timeout":10}]},{"matcher":"","hooks":[{"type":"command","command":"\"${CMUX_CLAUDE_HOOK_CMUX_BIN:-cmux}\" hooks feed --source claude","timeout":10,"async":true}]}],"SubagentStop":[{"matcher":"","hooks":[{"type":"command","command":"\"${CMUX_CLAUDE_HOOK_CMUX_BIN:-cmux}\" hooks feed --source claude","timeout":10,"async":true}]}],"SessionEnd":[{"matcher":"","hooks":[{"type":"command","command":"\"${CMUX_CLAUDE_HOOK_CMUX_BIN:-cmux}\" hooks claude session-end","timeout":1}]}],"Notification":[{"matcher":"","hooks":[{"type":"command","command":"\"${CMUX_CLAUDE_HOOK_CMUX_BIN:-cmux}\" hooks claude notification","timeout":10}]}],"UserPromptSubmit":[{"matcher":"","hooks":[{"type":"command","command":"\"${CMUX_CLAUDE_HOOK_CMUX_BIN:-cmux}\" hooks claude prompt-submit","timeout":10}]}],"PreToolUse":[{"matcher":"CronCreate","hooks":[{"type":"command","command":"\"${CMUX_CLAUDE_HOOK_CMUX_BIN:-cmux}\" hooks claude cron-create-guard","timeout":5}]},{"matcher":"","hooks":[{"type":"command","command":"\"${CMUX_CLAUDE_HOOK_CMUX_BIN:-cmux}\" hooks claude pre-tool-use","timeout":5,"async":true}]}],"PermissionRequest":[{"matcher":"","hooks":[{"type":"command","command":"\"${CMUX_CLAUDE_HOOK_CMUX_BIN:-cmux}\" hooks feed --source claude","timeout":125}]}]}}'
 
+generate_session_id() {
+    if command -v uuidgen >/dev/null 2>&1; then
+        uuidgen | tr '[:upper:]' '[:lower:]'
+        return 0
+    fi
+    if [[ -r /proc/sys/kernel/random/uuid ]]; then
+        tr -d '\n' < /proc/sys/kernel/random/uuid
+        return 0
+    fi
+    if command -v python3 >/dev/null 2>&1; then
+        python3 -c 'import uuid; print(uuid.uuid4())'
+        return 0
+    fi
+    if command -v node >/dev/null 2>&1; then
+        node -e 'process.stdout.write(require("crypto").randomUUID())'
+        echo
+        return 0
+    fi
+    # Last-resort: synthesize a v4 UUID from /dev/urandom hex with the
+    # version and variant bits patched. Falls back further on $RANDOM.
+    if [[ -r /dev/urandom ]]; then
+        local hex
+        hex="$(head -c 16 /dev/urandom 2>/dev/null | od -An -tx1 | tr -d ' \n')"
+        if [[ ${#hex} -ge 32 ]]; then
+            printf '%s-%s-4%s-%s%s-%s\n' \
+                "${hex:0:8}" "${hex:8:4}" "${hex:13:3}" \
+                "$(printf '%x' $(( (0x${hex:16:1} & 0x3) | 0x8 )))" "${hex:17:3}" \
+                "${hex:20:12}"
+            return 0
+        fi
+    fi
+    printf '%08x-%04x-4%03x-%04x-%012x\n' \
+        $((RANDOM*RANDOM)) $((RANDOM%65536)) $((RANDOM%4096)) \
+        $(((RANDOM%16384)+32768)) $((RANDOM*RANDOM*RANDOM))
+}
+
 if [[ "$SKIP_SESSION_ID" == true ]]; then
     exec "$REAL_CLAUDE" --settings "$HOOKS_JSON" "$@"
 else
-    SESSION_ID="$(uuidgen | tr '[:upper:]' '[:lower:]')"
+    SESSION_ID="$(generate_session_id)"
     exec "$REAL_CLAUDE" --session-id "$SESSION_ID" --settings "$HOOKS_JSON" "$@"
 fi
