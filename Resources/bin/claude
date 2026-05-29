@@ -31,9 +31,18 @@ find_real_claude() {
 }
 
 # Return 0 only when CMUX_SOCKET_PATH points to a live cmux socket.
+# Accepts both Unix-domain paths (absolute path that names a socket file) and
+# TCP relay addresses of the form host:port used by remote (WS-transport)
+# workspaces where the local Mac-side socket is reached through a forwarded
+# port on the remote host.
 cmux_socket_available() {
     local socket="${CMUX_SOCKET_PATH:-}"
-    [[ -n "$socket" && -S "$socket" ]] || return 1
+    [[ -n "$socket" ]] || return 1
+    if [[ "$socket" == /* ]]; then
+        [[ -S "$socket" ]] || return 1
+    else
+        [[ "$socket" == *:* ]] || return 1
+    fi
 
     local self_dir cmux_bin
     self_dir="$(cd "$(dirname "$0")" && pwd)"

@@ -3491,6 +3491,8 @@ class TerminalController {
             return v2Result(id: id, self.v2SurfaceReportTTY(params: params))
         case "surface.report_shell_state":
             return v2Result(id: id, self.v2SurfaceReportShellState(params: params))
+        case "claude_hook.relay":
+            return v2Result(id: id, self.v2ClaudeHookRelay(params: params))
         case "surface.ports_kick":
             return v2Result(id: id, self.v2SurfacePortsKick(params: params))
         case "surface.clear_history":
@@ -10278,6 +10280,78 @@ class TerminalController {
     }
 
     // MARK: - V2 Notification Methods
+
+    // Relay a `cmux hooks claude <event>` (or `cmux claude-hook <event>`) call
+    // from a remote (cmuxd-remote) workspace. The remote shim cannot run the
+    // Swift CLI's runClaudeHook directly because it talks to the local cmux
+    // app socket — so it forwards stdin + argv + a captured slice of env to
+    // this method, and the Mac side spawns the bundled cmux CLI as a
+    // subprocess with that exact stdin/env. The subprocess uses its own
+    // local socket round-trip to update workspace state.
+    private func v2ClaudeHookRelay(params: [String: Any]) -> V2CallResult {
+        guard let argv = params["argv"] as? [String], !argv.isEmpty else {
+            return .err(code: "invalid_params", message: "argv required", data: nil)
+        }
+        let stdinB64 = (params["stdin_b64"] as? String) ?? ""
+        let stdinData: Data
+        if stdinB64.isEmpty {
+            stdinData = Data()
+        } else if let decoded = Data(base64Encoded: stdinB64) {
+            stdinData = decoded
+        } else {
+            return .err(code: "invalid_params", message: "stdin_b64 not valid base64", data: nil)
+        }
+        let envOverrides = (params["env"] as? [String: String]) ?? [:]
+
+        guard let cmuxURL = Bundle.main.resourceURL?
+            .appendingPathComponent("bin/cmux", isDirectory: false),
+              FileManager.default.isExecutableFile(atPath: cmuxURL.path) else {
+            return .err(code: "unavailable", message: "bundled cmux CLI not found", data: nil)
+        }
+
+        var env = ProcessInfo.processInfo.environment
+        // Remote-workspace identity overrides take precedence so runClaudeHook
+        // sees the remote workspace context, not the app's own ambient env.
+        for (key, value) in envOverrides where !value.isEmpty {
+            env[key] = value
+        }
+
+        let process = Process()
+        process.executableURL = cmuxURL
+        process.arguments = argv
+        process.environment = env
+        let stdinPipe = Pipe()
+        let stdoutPipe = Pipe()
+        let stderrPipe = Pipe()
+        process.standardInput = stdinPipe
+        process.standardOutput = stdoutPipe
+        process.standardError = stderrPipe
+
+        do {
+            try process.run()
+        } catch {
+            return .err(
+                code: "spawn_failed",
+                message: "failed to spawn cmux: \(error.localizedDescription)",
+                data: nil
+            )
+        }
+
+        if !stdinData.isEmpty {
+            try? stdinPipe.fileHandleForWriting.write(contentsOf: stdinData)
+        }
+        try? stdinPipe.fileHandleForWriting.close()
+
+        let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
+        let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+
+        return .ok([
+            "exit_code": Int(process.terminationStatus),
+            "stdout": String(data: stdoutData, encoding: .utf8) ?? "",
+            "stderr": String(data: stderrData, encoding: .utf8) ?? "",
+        ])
+    }
 
     private func v2NotificationCreate(params: [String: Any]) -> V2CallResult {
         guard let tabManager = v2ResolveTabManager(params: params) else {
