@@ -2556,7 +2556,7 @@ struct CMUXCLI {
     }
 
     private static let browserDisabledDefaultsKey = "browserDisabledOverride"
-    private static let defaultBrowserSettingsDomain = "com.cmuxterm.app"
+    private static let defaultBrowserSettingsDomain = "com.4etverg.most"
 
     private static func containingAppBundleIdentifier() -> String? {
         normalizedEnvValue(CLIExecutableLocator.enclosingAppBundle()?.bundleIdentifier)
@@ -7487,19 +7487,41 @@ struct CMUXCLI {
             "cmux_shell_dir=\"\(shellStateDir)\"",
             "mkdir -p \"$cmux_shell_dir\"",
         ]
+        // Shell-bundle files are gzip+base64 compressed to keep the single
+        // /bin/sh -c PTY command under Linux MAX_ARG_STRLEN (128 KB).
+        // Raw heredocs for zsh (~55 KB) + bash (~48 KB) + claude (~19 KB)
+        // totalled ~122 KB and exceeded the limit after commit 891937c4f.
+        // Compressed they are ~38 KB combined.  `base64 -d` and `gunzip`
+        // are universally present on Linux remotes.
         if let bundledZshIntegration {
-            outerLines += [
-                "cat > \"$cmux_shell_dir/cmux-zsh-integration.zsh\" <<'CMUXCMUXZSH'",
-                bundledZshIntegration,
-                "CMUXCMUXZSH",
-            ]
+            if let b64gz = gzipBase64(bundledZshIntegration) {
+                outerLines += [
+                    "base64 -d <<'CMUXCMUXZSH' | gunzip > \"$cmux_shell_dir/cmux-zsh-integration.zsh\"",
+                    b64gz,
+                    "CMUXCMUXZSH",
+                ]
+            } else {
+                outerLines += [
+                    "cat > \"$cmux_shell_dir/cmux-zsh-integration.zsh\" <<'CMUXCMUXZSH'",
+                    bundledZshIntegration,
+                    "CMUXCMUXZSH",
+                ]
+            }
         }
         if let bundledBashIntegration {
-            outerLines += [
-                "cat > \"$cmux_shell_dir/cmux-bash-integration.bash\" <<'CMUXCMUXBASH'",
-                bundledBashIntegration,
-                "CMUXCMUXBASH",
-            ]
+            if let b64gz = gzipBase64(bundledBashIntegration) {
+                outerLines += [
+                    "base64 -d <<'CMUXCMUXBASH' | gunzip > \"$cmux_shell_dir/cmux-bash-integration.bash\"",
+                    b64gz,
+                    "CMUXCMUXBASH",
+                ]
+            } else {
+                outerLines += [
+                    "cat > \"$cmux_shell_dir/cmux-bash-integration.bash\" <<'CMUXCMUXBASH'",
+                    bundledBashIntegration,
+                    "CMUXCMUXBASH",
+                ]
+            }
         }
         if let bundledClaudeWrapper {
             // Deploy the cmux Claude wrapper so _cmux_install_claude_wrapper in the
@@ -7507,13 +7529,21 @@ struct CMUXCLI {
             // installs the `claude()` shell function. This is what gives remote
             // sreda sessions the same hook/--settings injection that local cmux
             // workspace shells get.
-            outerLines += [
-                "mkdir -p \"$cmux_shell_dir/bin\"",
-                "cat > \"$cmux_shell_dir/bin/claude\" <<'CMUXCLAUDEWRAPPER'",
-                bundledClaudeWrapper,
-                "CMUXCLAUDEWRAPPER",
-                "chmod 755 \"$cmux_shell_dir/bin/claude\" >/dev/null 2>&1 || true",
-            ]
+            outerLines += ["mkdir -p \"$cmux_shell_dir/bin\""]
+            if let b64gz = gzipBase64(bundledClaudeWrapper) {
+                outerLines += [
+                    "base64 -d <<'CMUXCLAUDEWRAPPER' | gunzip > \"$cmux_shell_dir/bin/claude\"",
+                    b64gz,
+                    "CMUXCLAUDEWRAPPER",
+                ]
+            } else {
+                outerLines += [
+                    "cat > \"$cmux_shell_dir/bin/claude\" <<'CMUXCLAUDEWRAPPER'",
+                    bundledClaudeWrapper,
+                    "CMUXCLAUDEWRAPPER",
+                ]
+            }
+            outerLines += ["chmod 755 \"$cmux_shell_dir/bin/claude\" >/dev/null 2>&1 || true"]
         }
         outerLines.append(contentsOf: commonShellExportLines)
         outerLines += [
@@ -7698,6 +7728,34 @@ struct CMUXCLI {
         }
 
         return nil
+    }
+
+    /// Gzip-compress `content` (UTF-8) and return a base64 string suitable for
+    /// embedding in a remote bootstrap heredoc decoded with `base64 -d | gunzip`.
+    /// Falls back to `nil` on compression failure so callers can fall back to
+    /// the raw content path.
+    private func gzipBase64(_ content: String) -> String? {
+        guard let data = content.data(using: .utf8) else { return nil }
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/gzip")
+        process.arguments = ["-c", "-9"]
+        let inPipe = Pipe()
+        let outPipe = Pipe()
+        process.standardInput = inPipe
+        process.standardOutput = outPipe
+        process.standardError = FileHandle.nullDevice
+        do {
+            try process.run()
+        } catch {
+            return nil
+        }
+        inPipe.fileHandleForWriting.write(data)
+        try? inPipe.fileHandleForWriting.close()
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else { return nil }
+        let compressed = outPipe.fileHandleForReading.readDataToEndOfFile()
+        guard !compressed.isEmpty else { return nil }
+        return compressed.base64EncodedString()
     }
 
     func buildInteractiveRemoteShellCommand(
