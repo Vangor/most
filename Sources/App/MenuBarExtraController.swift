@@ -694,7 +694,7 @@ enum MenuBarIconRenderer {
         image.lockFocus()
         defer { image.unlockFocus() }
 
-        let glyphRect = NSRect(x: 1.2, y: 1.5, width: 11.6, height: 15.0)
+        let glyphRect = NSRect(x: 0.5, y: 0.5, width: 17.0, height: 17.0)
         drawGlyph(in: glyphRect)
 
         if let text = badgeText {
@@ -706,7 +706,24 @@ enum MenuBarIconRenderer {
     }
 
     private static func drawGlyph(in rect: NSRect) {
-        // Match the canonical cmux center-mark path from Icon Center Image Artwork.svg.
+        // Draw the most paper-plane + bridge mark from the bundled menubar
+        // image asset. Falls back to the legacy cmux center-mark path if the
+        // asset can't be loaded (defensive — the asset ships in
+        // Assets.xcassets/MenubarIcon).
+        if let icon = NSImage(named: "MenubarIcon") {
+            icon.isTemplate = true
+            icon.draw(
+                in: rect,
+                from: .zero,
+                operation: .sourceOver,
+                fraction: 1.0,
+                respectFlipped: true,
+                hints: nil
+            )
+            return
+        }
+
+        // Fallback to the historical cmux center-mark path.
         let srcMinX: CGFloat = 384.0
         let srcMinY: CGFloat = 255.0
         let srcWidth: CGFloat = 369.0
