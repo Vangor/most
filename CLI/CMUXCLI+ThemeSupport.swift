@@ -340,7 +340,7 @@ extension CMUXCLI {
     private func bundleIdentifierForThemeReloadSocketPath(_ socketPath: String) -> String? {
         let name = URL(fileURLWithPath: socketPath).lastPathComponent
         switch name {
-        case "cmux.sock":
+        case "most.sock":
             return Self.cmuxThemeOverrideBundleIdentifier
         case "cmux-debug.sock":
             return "com.4etverg.most.debug"
@@ -352,7 +352,7 @@ extension CMUXCLI {
             break
         }
 
-        if name.range(of: #"^cmux-\d+\.sock$"#, options: .regularExpression) != nil {
+        if name.range(of: #"^most-\d+\.sock$"#, options: .regularExpression) != nil {
             return Self.cmuxThemeOverrideBundleIdentifier
         }
 

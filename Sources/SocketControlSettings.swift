@@ -62,7 +62,7 @@ enum SocketControlMode: String, CaseIterable, Identifiable {
 }
 
 enum SocketControlPasswordStore {
-    static let directoryName = "cmux"
+    static let directoryName = "most"
     static let fileName = "socket-control-password"
     static let didChangeNotification = Notification.Name("cmux.socketControlPasswordDidChange")
     private static let keychainMigrationDefaultsKey = "socketControlPasswordMigrationVersion"
@@ -297,9 +297,9 @@ struct SocketControlSettings {
     static let socketPasswordEnvKey = "CMUX_SOCKET_PASSWORD"
     static let launchTagEnvKey = "CMUX_TAG"
     static let baseDebugBundleIdentifier = "com.4etverg.most.debug"
-    private static let socketDirectoryName = "cmux"
-    private static let stableSocketFileName = "cmux.sock"
-    static let legacyStableDefaultSocketPath = "/tmp/cmux.sock"
+    private static let socketDirectoryName = "most"
+    private static let stableSocketFileName = "most.sock"
+    static let legacyStableDefaultSocketPath = "/tmp/most.sock"
 
     static var stableDefaultSocketPath: String {
         stableSocketFileURL()?.path ?? legacyStableDefaultSocketPath
@@ -619,12 +619,12 @@ struct SocketControlSettings {
 
     static func userScopedStableSocketPath(currentUserID: uid_t = getuid()) -> String {
         stableSocketDirectoryURL()?
-            .appendingPathComponent("cmux-\(currentUserID).sock", isDirectory: false)
-            .path ?? "/tmp/cmux-\(currentUserID).sock"
+            .appendingPathComponent("most-\(currentUserID).sock", isDirectory: false)
+            .path ?? "/tmp/most-\(currentUserID).sock"
     }
 
     static func legacyUserScopedStableSocketPath(currentUserID: uid_t = getuid()) -> String {
-        "/tmp/cmux-\(currentUserID).sock"
+        "/tmp/most-\(currentUserID).sock"
     }
 
     static func resolvedStableDefaultSocketPath(
