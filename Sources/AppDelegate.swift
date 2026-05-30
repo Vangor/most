@@ -12425,6 +12425,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             return true
         }
 
+        // Sidebar font size zoom (⌘+ / ⌘−).
+        // The `.sidebarFontSize` context gates these away from browser and
+        // terminal focus, so they only fire when a sidebar (or no specialized
+        // surface) has keyboard focus. Terminal font zoom still reaches Ghostty
+        // via cmux_performKeyEquivalent.
+        if matchConfiguredShortcut(event: event, action: .increaseSidebarFontSize) {
+            SidebarFontSizeProvider.adjustOverride(delta: 1.0)
+            return true
+        }
+        if matchConfiguredShortcut(event: event, action: .decreaseSidebarFontSize) {
+            SidebarFontSizeProvider.adjustOverride(delta: -1.0)
+            return true
+        }
+
         if matchConfiguredShortcut(event: event, action: .sendFeedback) {
             guard let targetContext = preferredMainWindowContextForShortcuts(event: event),
                   let targetWindow = targetContext.window ?? windowForMainWindowId(targetContext.windowId) else {

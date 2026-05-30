@@ -4,6 +4,8 @@ import WebKit
 struct ShortcutEventFocusContext {
     let browserPanel: BrowserPanel?
     let rightSidebarFocused: Bool
+    /// True when a Ghostty terminal surface owns keyboard focus.
+    let terminalFocused: Bool
 }
 
 struct ShortcutEventFocusContextCache {
@@ -17,12 +19,16 @@ extension KeyboardShortcutSettings.Action {
         case nonBrowserPanel
         case browserPanel
         case rightSidebarFocus
+        /// Available when no browser panel and no Ghostty terminal is focused.
+        /// Used for sidebar font size zoom so it doesn't collide with terminal
+        /// font zoom (⌘+/⌘−) or browser zoom.
+        case sidebarFontSize
 
         var isAlwaysAvailable: Bool {
             self == .application
         }
 
-        func isAvailable(focusedBrowserPanel: Bool, rightSidebarFocused: Bool) -> Bool {
+        func isAvailable(focusedBrowserPanel: Bool, rightSidebarFocused: Bool, terminalFocused: Bool = false) -> Bool {
             switch self {
             case .application:
                 return true
@@ -32,16 +38,28 @@ extension KeyboardShortcutSettings.Action {
                 return focusedBrowserPanel
             case .rightSidebarFocus:
                 return rightSidebarFocused
+            case .sidebarFontSize:
+                return !focusedBrowserPanel && !terminalFocused
             }
         }
 
         func isAvailable(_ context: ShortcutEventFocusContext) -> Bool {
-            isAvailable(focusedBrowserPanel: context.browserPanel != nil, rightSidebarFocused: context.rightSidebarFocused)
+            isAvailable(
+                focusedBrowserPanel: context.browserPanel != nil,
+                rightSidebarFocused: context.rightSidebarFocused,
+                terminalFocused: context.terminalFocused
+            )
         }
 
         func overlaps(_ other: ShortcutContext) -> Bool {
             if self == .application || other == .application {
                 return true
+            }
+            switch (self, other) {
+            case (.sidebarFontSize, .nonBrowserPanel), (.nonBrowserPanel, .sidebarFontSize):
+                return true
+            default:
+                break
             }
             return self == other
         }
@@ -56,6 +74,8 @@ extension KeyboardShortcutSettings.Action {
         case .browserBack, .browserForward, .browserReload, .toggleBrowserDeveloperTools, .showBrowserJavaScriptConsole,
              .browserZoomIn, .browserZoomOut, .browserZoomReset:
             return .browserPanel
+        case .increaseSidebarFontSize, .decreaseSidebarFontSize:
+            return .sidebarFontSize
         default:
             return .application
         }
@@ -84,9 +104,11 @@ extension AppDelegate {
         }
 
         let shortcutWindow = shortcutResolvedEventWindow(event) ?? NSApp.keyWindow ?? NSApp.mainWindow
+        let firstResponder = shortcutWindow?.firstResponder
         let context = ShortcutEventFocusContext(
             browserPanel: shortcutEventFocusedBrowserPanel(event) ?? shortcutWebInspectorFocusedBrowserPanel(in: shortcutWindow),
-            rightSidebarFocused: shortcutWindow.map { shouldRouteRightSidebarModeShortcut(in: $0) } ?? false
+            rightSidebarFocused: shortcutWindow.map { shouldRouteRightSidebarModeShortcut(in: $0) } ?? false,
+            terminalFocused: cmuxOwningGhosttyView(for: firstResponder) != nil
         )
         shortcutEventFocusContextCache = ShortcutEventFocusContextCache(event: event, context: context)
         return context

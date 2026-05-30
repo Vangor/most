@@ -73,6 +73,21 @@ enum FileExplorerStyle: Int, CaseIterable {
         }
     }
 
+    /// Returns the name font scaled by `fontScale` (1.0 = default size).
+    func scaledNameFont(fontScale: CGFloat) -> NSFont {
+        guard fontScale != 1.0 else { return nameFont }
+        let base = nameFont
+        let newSize = max(8, base.pointSize * fontScale)
+        // ?? base: falls back to the unscaled font if the descriptor match fails.
+        return NSFont(descriptor: base.fontDescriptor, size: newSize) ?? base
+    }
+
+    /// Returns the row height scaled by `fontScale` (1.0 = default size).
+    func scaledRowHeight(fontScale: CGFloat) -> CGFloat {
+        guard fontScale != 1.0 else { return rowHeight }
+        return max(16, (rowHeight * fontScale).rounded())
+    }
+
     var iconToTextSpacing: CGFloat {
         switch self {
         case .liquidGlass: return 8

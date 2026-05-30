@@ -9581,11 +9581,55 @@ enum SidebarTabItemFontScale {
 }
 
 enum SidebarFontSizeProvider {
+    /// The UserDefaults key for a persisted sidebar font size override set by ⌘+/⌘−.
+    /// A stored value of 0 means no override is active; the config-file value is used.
+    static let overrideUserDefaultsKey = "sidebarFontSizeOverride"
+
+    /// Returns the effective sidebar font size: the UserDefaults override if set,
+    /// otherwise the value from the Ghostty config file.
     static func loadFromGhosttyConfig() async -> CGFloat {
         await Task.detached(priority: .utility) {
-            GhosttyConfig.load().sidebarFontSize
+            effectiveSidebarFontSizeSync()
         }.value
     }
+
+    /// Synchronous read of the effective size — safe to call off-main.
+    static func effectiveSidebarFontSizeSync(
+        defaults: UserDefaults = .standard
+    ) -> CGFloat {
+        let override = defaults.double(forKey: overrideUserDefaultsKey)
+        if override > 0 {
+            return GhosttyConfig.clampedSidebarFontSize(CGFloat(override))
+        }
+        return GhosttyConfig.load().sidebarFontSize
+    }
+
+    /// Adjust the persisted override by `delta` and return the new effective size.
+    /// Call this on any thread; it is thread-safe (UserDefaults synchronizes internally).
+    @discardableResult
+    static func adjustOverride(
+        delta: CGFloat,
+        defaults: UserDefaults = .standard
+    ) -> CGFloat {
+        let current = effectiveSidebarFontSizeSync(defaults: defaults)
+        let next = GhosttyConfig.clampedSidebarFontSize(current + delta)
+        defaults.set(Double(next), forKey: overrideUserDefaultsKey)
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(
+                name: .sidebarFontSizeOverrideDidChange,
+                object: nil
+            )
+        }
+        return next
+    }
+}
+
+extension Notification.Name {
+    /// Posted on the main thread whenever the sidebar font size UserDefaults
+    /// override is written by ⌘+/⌘−. Listeners refresh their font scale.
+    static let sidebarFontSizeOverrideDidChange = Notification.Name(
+        "cmux.sidebarFontSizeOverrideDidChange"
+    )
 }
 
 private struct SidebarTabItemSettingsSnapshot: Equatable {
@@ -9773,6 +9817,7 @@ private final class SidebarTabItemSettingsStore: ObservableObject {
     private var sidebarFontSizeLoadTask: Task<Void, Never>?
     private var defaultsObserver: NSObjectProtocol?
     private var ghosttyConfigObserver: NSObjectProtocol?
+    private var sidebarFontSizeOverrideObserver: NSObjectProtocol?
 
     init(
         defaults: UserDefaults = .standard,
@@ -9805,6 +9850,15 @@ private final class SidebarTabItemSettingsStore: ObservableObject {
                 self?.refreshSidebarFontSize()
             }
         }
+        sidebarFontSizeOverrideObserver = NotificationCenter.default.addObserver(
+            forName: .sidebarFontSizeOverrideDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.refreshSidebarFontSize()
+            }
+        }
     }
 
     deinit {
@@ -9814,6 +9868,9 @@ private final class SidebarTabItemSettingsStore: ObservableObject {
         }
         if let ghosttyConfigObserver {
             NotificationCenter.default.removeObserver(ghosttyConfigObserver)
+        }
+        if let sidebarFontSizeOverrideObserver {
+            NotificationCenter.default.removeObserver(sidebarFontSizeOverrideObserver)
         }
     }
 

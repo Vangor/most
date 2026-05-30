@@ -553,6 +553,10 @@ struct DockPanelView: View {
     let rootDirectory: String?
     let workspaceId: UUID?
     @ObservedObject var store: DockControlsStore
+    /// Scale multiplier derived from `sidebar-font-size`. Default 1.0 = no change.
+    var fontScale: CGFloat = 1.0
+
+    private func rsScaled(_ base: CGFloat) -> CGFloat { base * fontScale }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -582,7 +586,7 @@ struct DockPanelView: View {
     private var toolbar: some View {
         HStack(spacing: 6) {
             Text(store.sourceLabel)
-                .font(.system(size: 11, weight: .medium))
+                .font(.system(size: rsScaled(11), weight: .medium))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .truncationMode(.middle)
@@ -591,7 +595,7 @@ struct DockPanelView: View {
                 store.openConfiguration()
             } label: {
                 Image(systemName: "doc.text")
-                    .font(.system(size: 11, weight: .medium))
+                    .font(.system(size: rsScaled(11), weight: .medium))
             }
             .buttonStyle(.plain)
             .help(String(localized: "dock.action.openConfig", defaultValue: "Open Dock Config"))
@@ -601,7 +605,7 @@ struct DockPanelView: View {
                 store.reload(rootDirectory: rootDirectory, workspaceId: workspaceId)
             } label: {
                 Image(systemName: "arrow.clockwise")
-                    .font(.system(size: 11, weight: .medium))
+                    .font(.system(size: rsScaled(11), weight: .medium))
             }
             .buttonStyle(.plain)
             .help(String(localized: "dock.action.reload", defaultValue: "Reload Dock"))
@@ -615,16 +619,17 @@ struct DockPanelView: View {
     @ViewBuilder
     private var content: some View {
         if let trustRequest = store.trustRequest {
-            DockTrustView(request: trustRequest) {
+            DockTrustView(request: trustRequest, fontScale: fontScale) {
                 store.trustAndReload()
             }
         } else if let error = store.errorMessage {
-            DockErrorView(message: error)
+            DockErrorView(message: error, fontScale: fontScale)
         } else if store.controls.isEmpty {
             DockEmptyView()
         } else {
             DockControlsLayoutView(
                 snapshots: store.controlSnapshots,
+                fontScale: fontScale,
                 terminalAttachment: { id in store.terminalAttachment(for: id) },
                 onFocus: { id in store.focusControl(id: id) },
                 onRestart: { id in store.restartControl(id: id) },
@@ -637,6 +642,7 @@ struct DockPanelView: View {
 
 private struct DockControlsLayoutView: View {
     let snapshots: [DockControlSnapshot]
+    var fontScale: CGFloat = 1.0
     let terminalAttachment: (String) -> DockTerminalAttachment?
     let onFocus: (String) -> Void
     let onRestart: (String) -> Void
@@ -657,6 +663,7 @@ private struct DockControlsLayoutView: View {
                             snapshot: snapshot,
                             ordinal: index + 1,
                             terminalHeight: heights[index],
+                            fontScale: fontScale,
                             onFocus: { onFocus(snapshot.id) },
                             onRestart: { onRestart(snapshot.id) },
                             terminalContent: {
@@ -724,9 +731,12 @@ private struct DockControlSectionView<TerminalContent: View>: View {
     let snapshot: DockControlSnapshot
     let ordinal: Int
     let terminalHeight: CGFloat
+    var fontScale: CGFloat = 1.0
     let onFocus: () -> Void
     let onRestart: () -> Void
     @ViewBuilder let terminalContent: () -> TerminalContent
+
+    private func rsScaled(_ base: CGFloat) -> CGFloat { base * fontScale }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -741,15 +751,15 @@ private struct DockControlSectionView<TerminalContent: View>: View {
     private var header: some View {
         HStack(spacing: 6) {
             Text("\(ordinal)")
-                .font(.system(size: 10, weight: .semibold).monospacedDigit())
+                .font(.system(size: rsScaled(10), weight: .semibold).monospacedDigit())
                 .foregroundStyle(.secondary)
                 .frame(width: 18, alignment: .center)
             Text(snapshot.title)
-                .font(.system(size: 12, weight: .semibold))
+                .font(.system(size: rsScaled(12), weight: .semibold))
                 .lineLimit(1)
                 .truncationMode(.tail)
             Text(snapshot.command)
-                .font(.system(size: 10, weight: .regular, design: .monospaced))
+                .font(.system(size: rsScaled(10), weight: .regular, design: .monospaced))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .truncationMode(.middle)
@@ -758,7 +768,7 @@ private struct DockControlSectionView<TerminalContent: View>: View {
                 onFocus()
             } label: {
                 Image(systemName: "keyboard")
-                    .font(.system(size: 10, weight: .medium))
+                    .font(.system(size: rsScaled(10), weight: .medium))
             }
             .buttonStyle(.plain)
             .help(String(localized: "dock.action.focusControl", defaultValue: "Focus Control"))
@@ -768,7 +778,7 @@ private struct DockControlSectionView<TerminalContent: View>: View {
                 onRestart()
             } label: {
                 Image(systemName: "arrow.clockwise")
-                    .font(.system(size: 10, weight: .medium))
+                    .font(.system(size: rsScaled(10), weight: .medium))
             }
             .buttonStyle(.plain)
             .help(String(localized: "dock.action.restartControl", defaultValue: "Restart Control"))
@@ -809,7 +819,10 @@ private struct DockTerminalView: View {
 
 private struct DockTrustView: View {
     let request: DockTrustRequest
+    var fontScale: CGFloat = 1.0
     let onTrust: () -> Void
+
+    private func rsScaled(_ base: CGFloat) -> CGFloat { base * fontScale }
 
     var body: some View {
         VStack(spacing: 10) {
@@ -817,16 +830,16 @@ private struct DockTrustView: View {
                 .font(.system(size: 28))
                 .foregroundStyle(.orange)
             Text(String(localized: "dock.trust.title", defaultValue: "Trust Project Dock?"))
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: rsScaled(13), weight: .semibold))
             Text(String(
                 localized: "dock.trust.message",
                 defaultValue: "This project wants to start commands from its Dock config."
             ))
-            .font(.system(size: 12))
+            .font(.system(size: rsScaled(12)))
             .foregroundStyle(.secondary)
             .multilineTextAlignment(.center)
             Text(request.configPath)
-                .font(.system(size: 10, weight: .regular, design: .monospaced))
+                .font(.system(size: rsScaled(10), weight: .regular, design: .monospaced))
                 .foregroundStyle(.secondary)
                 .lineLimit(2)
                 .truncationMode(.middle)
@@ -843,6 +856,9 @@ private struct DockTrustView: View {
 
 private struct DockErrorView: View {
     let message: String
+    var fontScale: CGFloat = 1.0
+
+    private func rsScaled(_ base: CGFloat) -> CGFloat { base * fontScale }
 
     var body: some View {
         VStack(spacing: 8) {
@@ -850,9 +866,9 @@ private struct DockErrorView: View {
                 .font(.system(size: 24))
                 .foregroundStyle(.orange)
             Text(String(localized: "dock.error.title", defaultValue: "Dock Config Error"))
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: rsScaled(13), weight: .semibold))
             Text(message)
-                .font(.system(size: 12))
+                .font(.system(size: rsScaled(12)))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
         }

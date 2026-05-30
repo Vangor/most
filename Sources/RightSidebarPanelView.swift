@@ -232,9 +232,15 @@ struct RightSidebarPanelView: View {
         }
         .onChange(of: fileExplorerState.isVisible) { _, visible in if !visible { dockStore.deactivate() } }
         .onChange(of: dockEnabled) { _, _ in refreshModeAvailabilityAndFocusIfNeeded() }
-        // Reload the scale whenever the Ghostty config is reloaded.
+        // Reload the scale whenever the Ghostty config is reloaded or the
+        // sidebar font size override is adjusted via ⌘+/⌘−.
         .onReceive(
             NotificationCenter.default.publisher(for: .ghosttyConfigDidReload)
+        ) { _ in
+            fontScaleRefreshToken &+= 1
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(for: .sidebarFontSizeOverrideDidChange)
         ) { _ in
             fontScaleRefreshToken &+= 1
         }
@@ -426,9 +432,9 @@ struct RightSidebarPanelView: View {
                     sessionIndexStore.setCurrentDirectoryIfChanged(sessionIndexDirectory)
                 }
         case .feed:
-            FeedPanelView()
+            FeedPanelView(fontScale: fontScale)
         case .dock:
-            DockPanelView(rootDirectory: sessionIndexDirectory, workspaceId: workspaceId, store: dockStore)
+            DockPanelView(rootDirectory: sessionIndexDirectory, workspaceId: workspaceId, store: dockStore, fontScale: fontScale)
         }
     }
 

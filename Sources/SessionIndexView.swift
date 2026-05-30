@@ -107,6 +107,11 @@ struct SessionIndexView: View {
         ) { _ in
             fontScaleRefreshToken &+= 1
         }
+        .onReceive(
+            NotificationCenter.default.publisher(for: .sidebarFontSizeOverrideDidChange)
+        ) { _ in
+            fontScaleRefreshToken &+= 1
+        }
         .task(id: fontScaleRefreshToken) {
             let size = await SidebarFontSizeProvider.loadFromGhosttyConfig()
             guard !Task.isCancelled else { return }
@@ -790,6 +795,11 @@ private struct SessionTranscriptPreviewView: View {
         )
         .onReceive(
             NotificationCenter.default.publisher(for: .ghosttyConfigDidReload)
+        ) { _ in
+            fontScaleRefreshToken &+= 1
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(for: .sidebarFontSizeOverrideDidChange)
         ) { _ in
             fontScaleRefreshToken &+= 1
         }
@@ -2410,6 +2420,11 @@ private struct SectionPopoverView: View {
         }
         .onReceive(
             NotificationCenter.default.publisher(for: .ghosttyConfigDidReload)
+        ) { _ in
+            fontScaleRefreshToken &+= 1
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(for: .sidebarFontSizeOverrideDidChange)
         ) { _ in
             fontScaleRefreshToken &+= 1
         }
