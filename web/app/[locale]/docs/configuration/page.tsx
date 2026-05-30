@@ -48,6 +48,7 @@ const sectionOrder = [
   "commands",
   "browser",
   "shortcuts",
+  "vault",
 ] as const;
 
 const settingsFileExample = `{

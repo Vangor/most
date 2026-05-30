@@ -152,6 +152,14 @@
             }
           },
           "default": []
+        },
+        "maxAgeDays": {
+          "type": "integer",
+          "description": "Drop Vault sidebar entries whose file mtime is older than this many days. Omit or use a positive integer; 0 disables (same as absent, default behavior)."
+        },
+        "maxEntriesPerAgent": {
+          "type": "integer",
+          "description": "Maximum number of entries loaded per agent in the Vault sidebar initial scan. Omit or use a positive integer; 0 disables (same as absent, uses built-in default of 30)."
         }
       }
     },

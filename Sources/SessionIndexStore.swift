@@ -466,6 +466,10 @@ final class SessionIndexStore: ObservableObject {
     private struct LoadedAgentOrder: Sendable {
         let agents: [SessionAgent]
         let registry: CmuxVaultAgentRegistry
+        /// Resolved from `vault.maxAgeDays`; nil = no cutoff.
+        let maxAgeDays: Int?
+        /// Resolved from `vault.maxEntriesPerAgent`; nil = use `perAgentLimit`.
+        let maxEntriesPerAgent: Int?
     }
 
     nonisolated private static func defaultAgentOrder(workingDirectory: String?) async -> LoadedAgentOrder {
@@ -480,7 +484,12 @@ final class SessionIndexStore: ObservableObject {
         let agents = SessionAgent.builtInCases + registry.registrations.compactMap {
             builtInIDs.contains($0.id) ? nil : .registered(RegisteredSessionAgent(registration: $0))
         }
-        return LoadedAgentOrder(agents: agents, registry: registry)
+        return LoadedAgentOrder(
+            agents: agents,
+            registry: registry,
+            maxAgeDays: registry.maxAgeDays,
+            maxEntriesPerAgent: registry.maxEntriesPerAgent
+        )
     }
 
     nonisolated private static func vaultAgentRegistry(workingDirectory: String?) async -> CmuxVaultAgentRegistry {
@@ -595,7 +604,8 @@ final class SessionIndexStore: ObservableObject {
         if noFolderScope {
             merged = merged.filter { ($0.cwd ?? "").isEmpty }
         }
-        let sorted = merged.sorted { $0.modified > $1.modified }
+        var sorted = merged.sorted { $0.modified > $1.modified }
+        sorted = Self.applyAgeCutoff(sorted, maxAgeDays: order.maxAgeDays)
         let snapshot = DirectorySnapshot(cwd: key, entries: sorted, errors: bag.snapshot())
         // Only cache this result if no `reload()` raced in while the
         // build was running. Otherwise the caller gets a fresh snapshot
@@ -645,6 +655,8 @@ final class SessionIndexStore: ObservableObject {
 
     // MARK: - Scanning
 
+    /// Default per-agent entry cap for the Vault sidebar initial load.
+    /// Overridable via `vault.maxEntriesPerAgent` in `~/.config/cmux/cmux.json`.
     private static let perAgentLimit = 30
     nonisolated static let headByteCap = 64 * 1024
     nonisolated static let tailByteCap = 32 * 1024
@@ -657,16 +669,42 @@ final class SessionIndexStore: ObservableObject {
         // searches via the popover.
         let bag = ErrorBag()
         let order = await defaultAgentOrder(workingDirectory: nil)
+
+        // Respect vault.maxEntriesPerAgent; fall back to the built-in default.
+        let effectivePerAgentLimit: Int
+        if let configured = order.maxEntriesPerAgent, configured > 0 {
+            effectivePerAgentLimit = configured
+        } else {
+            effectivePerAgentLimit = perAgentLimit
+        }
+
         let combined = await loadAgents(
             order.agents,
             registry: order.registry,
             needle: "",
             cwdFilter: nil,
             offset: 0,
-            limit: perAgentLimit,
+            limit: effectivePerAgentLimit,
             errorBag: bag
         )
-        return combined.sorted { $0.modified > $1.modified }
+        var sorted = combined.sorted { $0.modified > $1.modified }
+
+        sorted = Self.applyAgeCutoff(sorted, maxAgeDays: order.maxAgeDays)
+
+        return sorted
+    }
+
+    /// Applies the vault.maxAgeDays cutoff to an already-sorted entry list.
+    /// When `maxAgeDays` is nil or ≤ 0 the list is returned unchanged (no cutoff).
+    /// `now` is injectable for deterministic testing; defaults to the current time.
+    static func applyAgeCutoff(
+        _ entries: [SessionEntry],
+        maxAgeDays: Int?,
+        now: Date = Date()
+    ) -> [SessionEntry] {
+        guard let maxAgeDays = maxAgeDays, maxAgeDays > 0 else { return entries }
+        let cutoff = now.addingTimeInterval(-TimeInterval(maxAgeDays) * 86_400)
+        return entries.filter { $0.modified >= cutoff }
     }
 
     private struct ClaudeParsed {
