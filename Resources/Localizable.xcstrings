@@ -114157,6 +114157,40 @@
         }
       }
     },
+    "shortcut.increaseSidebarFontSize.label": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Increase Sidebar Font Size"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "サイドバーのフォントサイズを拡大"
+          }
+        }
+      }
+    },
+    "shortcut.decreaseSidebarFontSize.label": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Decrease Sidebar Font Size"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "サイドバーのフォントサイズを縮小"
+          }
+        }
+      }
+    },
     "shortcut.switchRightSidebarToFiles.label": {
       "extractionState": "manual",
       "localizations": {

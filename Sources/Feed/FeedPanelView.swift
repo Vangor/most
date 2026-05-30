@@ -73,6 +73,8 @@ struct FeedPanelView: View {
 
     @State private var filter: Filter = .actionable
     @StateObject private var viewModel = FeedPanelViewModel()
+    /// Scale multiplier derived from `sidebar-font-size`. Default 1.0 = no change.
+    var fontScale: CGFloat = 1.0
 
     var body: some View {
         VStack(spacing: 0) {
@@ -82,6 +84,7 @@ struct FeedPanelView: View {
                 items: viewModel.items,
                 hasMorePersistedItems: viewModel.hasMorePersistedItems,
                 isLoadingOlderItems: viewModel.isLoadingOlderItems,
+                fontScale: fontScale,
                 onLoadOlderItems: viewModel.loadOlderItems
             )
         }
@@ -111,7 +114,8 @@ struct FeedPanelView: View {
             ForEach(Filter.allCases) { f in
                 FeedSecondaryFilterButton(
                     filter: f,
-                    isSelected: filter == f
+                    isSelected: filter == f,
+                    fontScale: fontScale
                 ) {
                     filter = f
                 }
@@ -124,8 +128,11 @@ struct FeedPanelView: View {
 private struct FeedSecondaryFilterButton: View {
     let filter: FeedPanelView.Filter
     let isSelected: Bool
+    var fontScale: CGFloat = 1.0
     let action: () -> Void
     @State private var isHovered = false
+
+    private func rsScaled(_ base: CGFloat) -> CGFloat { base * fontScale }
 
     var body: some View {
         Button(action: action) {
@@ -134,14 +141,14 @@ private struct FeedSecondaryFilterButton: View {
                     .symbolRenderingMode(.monochrome)
                     .font(
                         .system(
-                            size: RightSidebarChromeControlStyle.secondaryIconSize,
+                            size: rsScaled(RightSidebarChromeControlStyle.secondaryIconSize),
                             weight: RightSidebarChromeControlStyle.iconWeight
                         )
                     )
                 Text(filter.label)
                     .font(
                         .system(
-                            size: RightSidebarChromeControlStyle.labelSize,
+                            size: rsScaled(RightSidebarChromeControlStyle.labelSize),
                             weight: RightSidebarChromeControlStyle.labelWeight
                         )
                     )
@@ -167,6 +174,7 @@ private struct FeedListView: View {
     let items: [WorkstreamItem]
     let hasMorePersistedItems: Bool
     let isLoadingOlderItems: Bool
+    var fontScale: CGFloat = 1.0
     let onLoadOlderItems: () -> Void
 
     @State private var focusSnapshot = FeedFocusSnapshot()
@@ -352,6 +360,7 @@ private struct FeedListView: View {
             isSelected: focusSnapshot.selectedItemId == snapshot.id,
             isFocusActive: focusSnapshot.isKeyboardActive && focusSnapshot.selectedItemId == snapshot.id,
             showsDivider: showsDivider,
+            fontScale: fontScale,
             stopDraft: stopDraftBinding(for: snapshot.id),
             onPressSelect: {
                 selectRow(snapshot.id, focusFeed: false)
@@ -622,6 +631,7 @@ private struct FeedRowSurface: View {
     let isSelected: Bool
     let isFocusActive: Bool
     let showsDivider: Bool
+    var fontScale: CGFloat = 1.0
     @Binding var stopDraft: FeedStopDraft
     let onPressSelect: () -> Void
     let onControlFocus: () -> Void
@@ -638,6 +648,7 @@ private struct FeedRowSurface: View {
                 snapshot: snapshot,
                 actions: actions,
                 isSelected: isFocusActive,
+                fontScale: fontScale,
                 onPressSelect: onPressSelect,
                 onControlFocus: onControlFocus,
                 onControlAction: onControlAction,
@@ -998,6 +1009,9 @@ struct FeedItemRow: View, Equatable {
     let snapshot: FeedItemSnapshot
     let actions: FeedRowActions
     let isSelected: Bool
+    /// Scale multiplier from `sidebar-font-size`. Included in `==` so
+    /// the row re-renders when the user adjusts sidebar font size via ⌘+/⌘−.
+    var fontScale: CGFloat = 1.0
     let onPressSelect: () -> Void
     let onControlFocus: () -> Void
     let onControlAction: () -> Void
@@ -1010,9 +1024,12 @@ struct FeedItemRow: View, Equatable {
 
     @State private var didHandlePressSelection = false
 
+    private func rsScaled(_ base: CGFloat) -> CGFloat { base * fontScale }
+
     static func == (lhs: FeedItemRow, rhs: FeedItemRow) -> Bool {
         lhs.snapshot == rhs.snapshot
             && lhs.isSelected == rhs.isSelected
+            && lhs.fontScale == rhs.fontScale
             && lhs.stopDraftValue == rhs.stopDraftValue
             && lhs.stopFocusRequestValue == rhs.stopFocusRequestValue
     }
@@ -1024,7 +1041,7 @@ struct FeedItemRow: View, Equatable {
                 FeedContextBlock(context: context, source: snapshot.source)
             } else if let echo = promptEcho, !echo.isEmpty {
                 Text(echo)
-                    .font(.system(size: 11))
+                    .font(.system(size: rsScaled(11)))
                     .foregroundColor(.secondary)
                     .lineLimit(2)
                     .truncationMode(.tail)
@@ -1084,11 +1101,11 @@ struct FeedItemRow: View, Equatable {
     private var chipHeader: some View {
         HStack(alignment: .center, spacing: 8) {
             Image(systemName: snapshot.kind.symbolName)
-                .font(.system(size: 12, weight: .medium))
+                .font(.system(size: rsScaled(12), weight: .medium))
                 .foregroundColor(kindTint)
                 .frame(width: 14, height: 14)
             Text(headerTitle)
-                .font(.system(size: 12, weight: .medium))
+                .font(.system(size: rsScaled(12), weight: .medium))
                 .foregroundColor(.primary.opacity(0.92))
                 .lineLimit(1)
                 .truncationMode(.middle)
@@ -1159,8 +1176,8 @@ struct FeedItemRow: View, Equatable {
     private func chip(text: String, fg: Color, bg: Color, mono: Bool = false) -> some View {
         Text(text)
             .font(mono
-                  ? .system(size: 10, weight: .medium).monospacedDigit()
-                  : .system(size: 10, weight: .medium))
+                  ? .system(size: rsScaled(10), weight: .medium).monospacedDigit()
+                  : .system(size: rsScaled(10), weight: .medium))
             .foregroundColor(fg)
             .padding(.horizontal, 5)
             .padding(.vertical, 2)

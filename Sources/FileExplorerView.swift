@@ -156,7 +156,14 @@ struct FileExplorerPanelView: NSViewRepresentable {
         private var lastRootNodeCount: Int = -1
         private var observationCancellable: AnyCancellable?
         private var styleObserver: Any?
+        private var fontScaleOverrideObserver: Any?
+        private var fontScaleConfigObserver: Any?
         private var isUpdatingOutlineProgrammatically = false
+
+        /// Current font scale for outline-view rows, computed once and cached per notification.
+        var fontScale: CGFloat = SidebarTabItemFontScale.scale(
+            for: SidebarFontSizeProvider.effectiveSidebarFontSizeSync()
+        )
 
         init(
             store: FileExplorerStore,
@@ -187,6 +194,32 @@ struct FileExplorerPanelView: NSViewRepresentable {
                     self.applyStoredSelection(in: outlineView, fallbackToFirstVisible: false, scroll: false)
                 }
             }
+            fontScaleOverrideObserver = NotificationCenter.default.addObserver(
+                forName: .sidebarFontSizeOverrideDidChange, object: nil, queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor [weak self] in self?.refreshFontScale() }
+            }
+            fontScaleConfigObserver = NotificationCenter.default.addObserver(
+                forName: .ghosttyConfigDidReload, object: nil, queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor [weak self] in self?.refreshFontScale() }
+            }
+        }
+
+        /// Recomputes `fontScale` from the effective sidebar font size and reloads outline rows.
+        @MainActor
+        private func refreshFontScale() {
+            fontScale = SidebarTabItemFontScale.scale(
+                for: SidebarFontSizeProvider.effectiveSidebarFontSizeSync()
+            )
+            guard let outlineView else { return }
+            withProgrammaticOutlineUpdate {
+                outlineView.noteHeightOfRows(withIndexesChanged: IndexSet(0..<outlineView.numberOfRows))
+                outlineView.reloadData()
+                restoreExpansionState(store.expandedPaths, in: outlineView)
+                applyStoredSelection(in: outlineView, fallbackToFirstVisible: false, scroll: false)
+            }
+            containerView?.applyFontScaleUpdate()
         }
 
         @MainActor
@@ -214,6 +247,12 @@ struct FileExplorerPanelView: NSViewRepresentable {
 
         deinit {
             if let observer = styleObserver {
+                NotificationCenter.default.removeObserver(observer)
+            }
+            if let observer = fontScaleOverrideObserver {
+                NotificationCenter.default.removeObserver(observer)
+            }
+            if let observer = fontScaleConfigObserver {
                 NotificationCenter.default.removeObserver(observer)
             }
         }
@@ -324,7 +363,7 @@ struct FileExplorerPanelView: NSViewRepresentable {
             }
 
             let gitStatus = store.gitStatusByPath[node.path]
-            cellView.configure(with: node, gitStatus: gitStatus)
+            cellView.configure(with: node, gitStatus: gitStatus, fontScale: fontScale)
             cellView.onHover = { [weak self] isHovering in
                 guard let self else { return }
                 if isHovering {
@@ -378,7 +417,7 @@ struct FileExplorerPanelView: NSViewRepresentable {
         }
 
         func outlineView(_ outlineView: NSOutlineView, heightOfRowByItem item: Any) -> CGFloat {
-            FileExplorerStyle.current.rowHeight
+            FileExplorerStyle.current.scaledRowHeight(fontScale: fontScale)
         }
 
         // MARK: - Path-Owned Navigation
@@ -736,6 +775,8 @@ final class FileExplorerContainerView: NSView {
     private let coordinator: FileExplorerPanelView.Coordinator
     private let searchDebounceDelayMilliseconds = 200
     private let searchBarVisibleHeight: CGFloat = 48
+    /// Base row height for the search results table (unscaled).
+    private let baseSearchResultsRowHeight: CGFloat = 46
 
 #if DEBUG
     private var debugLastSearchTextChangeUptime: TimeInterval = 0
@@ -879,7 +920,7 @@ final class FileExplorerContainerView: NSView {
         searchResultsView.style = .plain
         searchResultsView.selectionHighlightStyle = .regular
         searchResultsView.backgroundColor = .clear
-        searchResultsView.rowHeight = 46
+        searchResultsView.rowHeight = baseSearchResultsRowHeight
         searchResultsView.allowsMultipleSelection = true
         searchResultsView.intercellSpacing = NSSize(width: 0, height: 0)
         searchResultsView.onCancel = { [weak self] in
@@ -996,6 +1037,20 @@ final class FileExplorerContainerView: NSView {
         guard coordinator.placement == .rightSidebar else { return }
         guard let window else { return }
         AppDelegate.shared?.keyboardFocusCoordinator(for: window)?.registerFileExplorerHost(self)
+    }
+
+    /// Returns the current scaled height for search result rows.
+    private func scaledSearchRowHeight() -> CGFloat {
+        max(28, (baseSearchResultsRowHeight * coordinator.fontScale).rounded())
+    }
+
+    /// Called by the Coordinator when the sidebar font scale changes.
+    /// Updates the search results table row height and reloads it.
+    func applyFontScaleUpdate() {
+        let newRowHeight = scaledSearchRowHeight()
+        searchResultsView.rowHeight = newRowHeight
+        searchResultsView.noteHeightOfRows(withIndexesChanged: IndexSet(0..<searchResultsView.numberOfRows))
+        searchResultsView.reloadData()
     }
 
     override func layout() {
@@ -1576,7 +1631,7 @@ extension FileExplorerContainerView: NSSearchFieldDelegate, NSTableViewDataSourc
     }
 
     func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
-        46
+        scaledSearchRowHeight()
     }
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
@@ -1588,7 +1643,7 @@ extension FileExplorerContainerView: NSSearchFieldDelegate, NSTableViewDataSourc
         } else {
             cellView = FileExplorerSearchResultCellView(identifier: identifier)
         }
-        cellView.configure(with: searchSnapshot.results[row])
+        cellView.configure(with: searchSnapshot.results[row], fontScale: coordinator.fontScale)
         return cellView
     }
 
@@ -1833,10 +1888,14 @@ private final class FileExplorerSearchResultCellView: NSTableCellView {
         ])
     }
 
-    func configure(with result: FileSearchResult) {
+    func configure(with result: FileSearchResult, fontScale: CGFloat = 1.0) {
         pathLabel.stringValue = "\(result.relativePath):\(result.lineNumber)"
         previewLabel.stringValue = result.preview.isEmpty ? " " : result.preview
         toolTip = "\(result.path):\(result.lineNumber):\(result.columnNumber)"
+        let pathSize = max(8, 12 * fontScale)
+        let previewSize = max(8, 11 * fontScale)
+        pathLabel.font = .systemFont(ofSize: pathSize, weight: .semibold)
+        previewLabel.font = .monospacedSystemFont(ofSize: previewSize, weight: .regular)
     }
 }
 
@@ -1994,11 +2053,11 @@ final class FileExplorerCellView: NSTableCellView {
         nameLabelTrailingToLoadingConstraint.isActive = false
     }
 
-    func configure(with node: FileExplorerNode, gitStatus: GitFileStatus? = nil) {
+    func configure(with node: FileExplorerNode, gitStatus: GitFileStatus? = nil, fontScale: CGFloat = 1.0) {
         assert(Thread.isMainThread, "AppKit image updates must run on the main thread")
         let style = FileExplorerStyle.current
         nameLabel.stringValue = node.name
-        nameLabel.font = style.nameFont
+        nameLabel.font = style.scaledNameFont(fontScale: fontScale)
         iconWidthConstraint.constant = style.iconSize
         iconHeightConstraint.constant = style.iconSize
         iconToTextConstraint.constant = style.iconToTextSpacing

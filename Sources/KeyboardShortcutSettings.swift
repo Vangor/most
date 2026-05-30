@@ -30,6 +30,8 @@ enum KeyboardShortcutSettings {
             .focusRightSidebar,
             .toggleRightSidebar,
             .findInDirectory,
+            .increaseSidebarFontSize,
+            .decreaseSidebarFontSize,
         ].filter(actions.contains)
         let actionSet = Set(colocatedSidebarActions)
         let baseActions = actions.filter { !actionSet.contains($0) }
@@ -122,6 +124,10 @@ enum KeyboardShortcutSettings {
         case splitBrowserRight
         case splitBrowserDown
 
+        // Sidebar font size
+        case increaseSidebarFontSize
+        case decreaseSidebarFontSize
+
         // File Explorer
         case toggleRightSidebar = "toggleFileExplorer"
 
@@ -207,6 +213,8 @@ enum KeyboardShortcutSettings {
             case .equalizeSplits: return String(localized: "shortcut.equalizeSplits.label", defaultValue: "Equalize Splits")
             case .splitBrowserRight: return String(localized: "shortcut.splitBrowserRight.label", defaultValue: "Split Browser Right")
             case .splitBrowserDown: return String(localized: "shortcut.splitBrowserDown.label", defaultValue: "Split Browser Down")
+            case .increaseSidebarFontSize: return String(localized: "shortcut.increaseSidebarFontSize.label", defaultValue: "Increase Sidebar Font Size")
+            case .decreaseSidebarFontSize: return String(localized: "shortcut.decreaseSidebarFontSize.label", defaultValue: "Decrease Sidebar Font Size")
             case .toggleRightSidebar: return String(localized: "shortcut.toggleRightSidebar.label", defaultValue: "Toggle Right Sidebar")
             case .saveFilePreview: return String(localized: "shortcut.saveFilePreview.label", defaultValue: "Save File Preview")
             case .openBrowser: return String(localized: "shortcut.openBrowser.label", defaultValue: "Open Browser")
@@ -361,6 +369,10 @@ enum KeyboardShortcutSettings {
                 return StoredShortcut(key: "a", command: true, shift: true, option: true, control: false)
             case .selectWorkspaceByNumber:
                 return StoredShortcut(key: "1", command: true, shift: false, option: false, control: false)
+            case .increaseSidebarFontSize:
+                return StoredShortcut(key: "=", command: true, shift: false, option: false, control: false)
+            case .decreaseSidebarFontSize:
+                return StoredShortcut(key: "-", command: true, shift: false, option: false, control: false)
             case .toggleRightSidebar:
                 return StoredShortcut(key: "b", command: true, shift: false, option: true, control: false)
             case .saveFilePreview:

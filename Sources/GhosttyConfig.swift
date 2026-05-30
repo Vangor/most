@@ -16,7 +16,7 @@ struct GhosttyConfig {
     private static var cachedConfigsByColorScheme: [ColorSchemePreference: GhosttyConfig] = [:]
     static let defaultSidebarFontSize: CGFloat = 12.5
     static let minSidebarFontSize: CGFloat = 10
-    static let maxSidebarFontSize: CGFloat = 20
+    static let maxSidebarFontSize: CGFloat = 40
 
     var fontFamily: String = "Menlo"
     var fontSize: CGFloat = 12
