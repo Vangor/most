@@ -87,9 +87,9 @@ enum CLISocketPathResolver {
         case inaccessible(errnoCode: Int32)
     }
 
-    private static let appSupportDirectoryName = "cmux"
-    private static let stableSocketFileName = "cmux.sock"
-    static let legacyDefaultSocketPath = "/tmp/cmux.sock"
+    private static let appSupportDirectoryName = "most"
+    private static let stableSocketFileName = "most.sock"
+    static let legacyDefaultSocketPath = "/tmp/most.sock"
     private static let fallbackSocketPath = "/tmp/cmux-debug.sock"
     private static let nightlySocketPath = "/tmp/cmux-nightly.sock"
     private static let stagingSocketPath = "/tmp/cmux-staging.sock"
@@ -118,12 +118,12 @@ enum CLISocketPathResolver {
 
     private static func userScopedStableSocketPath(currentUserID: uid_t = getuid()) -> String {
         stableSocketDirectoryURL()?
-            .appendingPathComponent("cmux-\(currentUserID).sock", isDirectory: false)
+            .appendingPathComponent("most-\(currentUserID).sock", isDirectory: false)
             .path ?? legacyUserScopedStableSocketPath(currentUserID: currentUserID)
     }
 
     private static func legacyUserScopedStableSocketPath(currentUserID: uid_t = getuid()) -> String {
-        "/tmp/cmux-\(currentUserID).sock"
+        "/tmp/most-\(currentUserID).sock"
     }
 
     static func isImplicitDefaultPath(
@@ -483,9 +483,9 @@ enum CLISocketPathResolver {
         }
 
 #if DEBUG
-        return "com.cmuxterm.app.debug"
+        return "com.4etverg.most.debug"
 #else
-        return "com.cmuxterm.app"
+        return "com.4etverg.most"
 #endif
     }
 

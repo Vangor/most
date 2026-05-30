@@ -62,7 +62,7 @@ enum SocketControlMode: String, CaseIterable, Identifiable {
 }
 
 enum SocketControlPasswordStore {
-    static let directoryName = "cmux"
+    static let directoryName = "most"
     static let fileName = "socket-control-password"
     static let didChangeNotification = Notification.Name("cmux.socketControlPasswordDidChange")
     private static let keychainMigrationDefaultsKey = "socketControlPasswordMigrationVersion"
@@ -296,10 +296,10 @@ struct SocketControlSettings {
     static let allowSocketPathOverrideKey = "CMUX_ALLOW_SOCKET_OVERRIDE"
     static let socketPasswordEnvKey = "CMUX_SOCKET_PASSWORD"
     static let launchTagEnvKey = "CMUX_TAG"
-    static let baseDebugBundleIdentifier = "com.cmuxterm.app.debug"
-    private static let socketDirectoryName = "cmux"
-    private static let stableSocketFileName = "cmux.sock"
-    static let legacyStableDefaultSocketPath = "/tmp/cmux.sock"
+    static let baseDebugBundleIdentifier = "com.4etverg.most.debug"
+    private static let socketDirectoryName = "most"
+    private static let stableSocketFileName = "most.sock"
+    static let legacyStableDefaultSocketPath = "/tmp/most.sock"
 
     static var stableDefaultSocketPath: String {
         stableSocketFileURL()?.path ?? legacyStableDefaultSocketPath
@@ -468,7 +468,7 @@ struct SocketControlSettings {
         stableDefaultSocketCanBeReclaimed: (String) -> Bool = { _ in true }
     ) -> String {
         guard !isDebugBuild,
-              normalizedBundleIdentifier(bundleIdentifier) == "com.cmuxterm.app",
+              normalizedBundleIdentifier(bundleIdentifier) == "com.4etverg.most",
               isStableReleaseSocketPath(preferredPath, currentUserID: currentUserID) else {
             return preferredPath
         }
@@ -484,7 +484,16 @@ struct SocketControlSettings {
                 ? preferredPath
                 : userScopedPath
         case .socket(let ownerUserID) where ownerUserID == currentUserID:
-            return userScopedPath
+            // A same-user socket at the stable path is either a live sibling instance
+            // (holds the socket-path lock -> coexist on the user-scoped path) or a stale
+            // leftover from an unclean exit (crash / SIGKILL / force-quit). The
+            // reclaimability check is lock-based (non-blocking flock + reusable marker),
+            // never a connecting liveness probe, so it is safe on the startup main thread.
+            // Without it, a stale stable socket permanently forces every later launch onto
+            // the user-scoped path and the CLI can never find `most.sock`.
+            return stableDefaultSocketCanBeReclaimed(preferredPath)
+                ? preferredPath
+                : userScopedPath
         case .socket, .other, .inaccessible:
             return preferredPath
         }
@@ -579,7 +588,7 @@ struct SocketControlSettings {
 
     private static func shouldReserveStableSocketPath(bundleIdentifier: String?, isDebugBuild: Bool) -> Bool {
         if isDebugBuild { return true }
-        return normalizedBundleIdentifier(bundleIdentifier) != "com.cmuxterm.app"
+        return normalizedBundleIdentifier(bundleIdentifier) != "com.4etverg.most"
     }
 
     private static func isStableReleaseSocketPath(_ path: String, currentUserID: uid_t) -> Bool {
@@ -619,12 +628,12 @@ struct SocketControlSettings {
 
     static func userScopedStableSocketPath(currentUserID: uid_t = getuid()) -> String {
         stableSocketDirectoryURL()?
-            .appendingPathComponent("cmux-\(currentUserID).sock", isDirectory: false)
-            .path ?? "/tmp/cmux-\(currentUserID).sock"
+            .appendingPathComponent("most-\(currentUserID).sock", isDirectory: false)
+            .path ?? "/tmp/most-\(currentUserID).sock"
     }
 
     static func legacyUserScopedStableSocketPath(currentUserID: uid_t = getuid()) -> String {
-        "/tmp/cmux-\(currentUserID).sock"
+        "/tmp/most-\(currentUserID).sock"
     }
 
     static func resolvedStableDefaultSocketPath(
@@ -677,19 +686,19 @@ struct SocketControlSettings {
 
     static func isDebugLikeBundleIdentifier(_ bundleIdentifier: String?) -> Bool {
         guard let bundleIdentifier else { return false }
-        return bundleIdentifier == "com.cmuxterm.app.debug"
-            || bundleIdentifier.hasPrefix("com.cmuxterm.app.debug.")
+        return bundleIdentifier == "com.4etverg.most.debug"
+            || bundleIdentifier.hasPrefix("com.4etverg.most.debug.")
     }
 
-    /// Tagged DEV builds have bundle IDs like `com.cmuxterm.app.debug.<tag>`.
+    /// Tagged DEV builds have bundle IDs like `com.4etverg.most.debug.<tag>`.
     static func isTaggedDevBuild(bundleIdentifier: String? = Bundle.main.bundleIdentifier) -> Bool {
         guard let bundleIdentifier else { return false }
         return bundleIdentifier.hasPrefix("\(baseDebugBundleIdentifier).")
     }
     static func isStagingBundleIdentifier(_ bundleIdentifier: String?) -> Bool {
         guard let bundleIdentifier else { return false }
-        return bundleIdentifier == "com.cmuxterm.app.staging"
-            || bundleIdentifier.hasPrefix("com.cmuxterm.app.staging.")
+        return bundleIdentifier == "com.4etverg.most.staging"
+            || bundleIdentifier.hasPrefix("com.4etverg.most.staging.")
     }
 
     static func stableSocketDirectoryURL(fileManager: FileManager = .default) -> URL? {

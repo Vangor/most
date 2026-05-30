@@ -38,7 +38,7 @@ enum CmuxApplicationSupportDirectories {
 }
 
 enum CmuxGhosttyConfigPathResolver {
-    static let releaseBundleIdentifier = "com.cmuxterm.app"
+    static let releaseBundleIdentifier = "com.4etverg.most"
     private static let releaseFallbackChannelSuffixes = ["debug", "nightly", "staging"]
 
     static func editableConfigURL(

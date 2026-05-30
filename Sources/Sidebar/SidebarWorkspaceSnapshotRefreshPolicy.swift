@@ -28,6 +28,7 @@ extension SidebarWorkspaceSnapshotBuilder.Snapshot {
             remoteStateHelpText: remoteStateHelpText,
             copyableSidebarSSHError: copyableSidebarSSHError,
             latestConversationMessage: latestConversationMessage,
+            claudeStatusBadge: claudeStatusBadge,
             metadataEntries: metadataEntries,
             metadataBlocks: metadataBlocks,
             latestLog: latestLog,

@@ -217,7 +217,7 @@ enum SidebarBranchLayoutSettings {
 
 enum SidebarBranchDirectoryStackedSettings {
     static let key = "sidebarBranchDirectoryStacked"
-    static let defaultStacked = false
+    static let defaultStacked = true
 
     static func isStacked(defaults: UserDefaults = .standard) -> Bool {
         if defaults.object(forKey: key) == nil {
@@ -229,7 +229,7 @@ enum SidebarBranchDirectoryStackedSettings {
 
 enum SidebarPathLastSegmentSettings {
     static let key = "sidebarPathLastSegmentOnly"
-    static let defaultLastSegmentOnly = false
+    static let defaultLastSegmentOnly = true
 
     static func isLastSegmentOnly(defaults: UserDefaults = .standard) -> Bool {
         if defaults.object(forKey: key) == nil {
@@ -2325,6 +2325,12 @@ class TabManager: ObservableObject {
               let directory = gitProbeDirectory(for: workspace, panelId: panelId) else {
             return
         }
+        // Remote workspaces report git state via shell-integration's report_git_branch.
+        // Running a local git probe against a remote path (which doesn't exist on the
+        // macOS filesystem) always returns branch=none and then clears the
+        // shell-reported branch via clearPanelGitBranch.  Skip the probe entirely for
+        // remote workspaces; the shell-side reporter is the authoritative source there.
+        guard !workspace.isRemoteWorkspace else { return }
 
         scheduleWorkspaceGitMetadataRefresh(
             workspaceId: workspaceId,

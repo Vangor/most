@@ -11,6 +11,18 @@ fi
 
 _cmux_send() {
     local payload="$1"
+    # Remote workspaces have CMUX_SOCKET_PATH=host:port (TCP relay).
+    # zsocket and the ncat/socat/nc -U paths below only handle Unix-domain
+    # sockets, so for the TCP form route through the cmuxd-remote
+    # `__v1` passthrough which writes the payload to the Mac socket via
+    # the established relay connection.
+    if [[ -n "$CMUX_SOCKET_PATH" && "$CMUX_SOCKET_PATH" != /* && "$CMUX_SOCKET_PATH" == *:* ]]; then
+        local relay_cli
+        relay_cli="$(_cmux_relay_cli_path)" || return 1
+        [[ -n "$relay_cli" ]] || return 1
+        "$relay_cli" __v1 "$payload" >/dev/null 2>&1
+        return $?
+    fi
     if (( _CMUX_HAS_ZSOCKET )); then
         local fd
         zsocket "$CMUX_SOCKET_PATH" 2>/dev/null || return 1
@@ -542,7 +554,7 @@ _cmux_report_tty_once() {
 _cmux_report_shell_activity_state() {
     local state="$1"
     [[ -n "$state" ]] || return 0
-    [[ -S "$CMUX_SOCKET_PATH" ]] || return 0
+    _cmux_has_port_scan_transport || return 0
     [[ -n "$CMUX_TAB_ID" ]] || return 0
     [[ -n "$CMUX_PANEL_ID" ]] || return 0
     [[ "$_CMUX_SHELL_ACTIVITY_LAST" == "$state" ]] && return 0
@@ -578,7 +590,7 @@ _cmux_report_git_branch_for_path() {
     local repo_path="$1"
     [[ "${CMUX_NO_GIT_WATCH:-}" == "1" ]] && return 0
     [[ -n "$repo_path" ]] || return 0
-    [[ -S "$CMUX_SOCKET_PATH" ]] || return 0
+    _cmux_has_port_scan_transport || return 0
     [[ -n "$CMUX_TAB_ID" ]] || return 0
     [[ -n "$CMUX_PANEL_ID" ]] || return 0
 
@@ -662,7 +674,7 @@ _cmux_record_pr_command_hint() {
 }
 
 _cmux_emit_pr_command_hint() {
-    [[ -S "$CMUX_SOCKET_PATH" ]] || return 0
+    _cmux_has_port_scan_transport || return 0
     [[ -n "$CMUX_TAB_ID" ]] || return 0
     [[ -n "$CMUX_PANEL_ID" ]] || return 0
     [[ -n "$_CMUX_LAST_PR_ACTION" ]] || return 0
@@ -679,7 +691,7 @@ _cmux_emit_pr_command_hint() {
 
 _cmux_clear_pr_for_panel() {
     [[ "${CMUX_NO_GIT_WATCH:-}" == "1" ]] && return 0
-    [[ -S "$CMUX_SOCKET_PATH" ]] || return 0
+    _cmux_has_port_scan_transport || return 0
     [[ -n "$CMUX_TAB_ID" ]] || return 0
     [[ -n "$CMUX_PANEL_ID" ]] || return 0
     _cmux_send_bg "clear_pr --tab=$CMUX_TAB_ID --panel=$CMUX_PANEL_ID"
@@ -1009,7 +1021,7 @@ _cmux_report_pr_for_path() {
         _cmux_clear_pr_for_panel
         return 0
     }
-    [[ -S "$CMUX_SOCKET_PATH" ]] || return 0
+    _cmux_has_port_scan_transport || return 0
     [[ -n "$CMUX_TAB_ID" ]] || return 0
     [[ -n "$CMUX_PANEL_ID" ]] || return 0
 
@@ -1203,7 +1215,7 @@ _cmux_stop_pr_poll_loop() {
 
 _cmux_start_pr_poll_loop() {
     [[ "${CMUX_NO_GIT_WATCH:-}" == "1" ]] && return 0
-    [[ -S "$CMUX_SOCKET_PATH" ]] || return 0
+    _cmux_has_port_scan_transport || return 0
     [[ -n "$CMUX_TAB_ID" ]] || return 0
     [[ -n "$CMUX_PANEL_ID" ]] || return 0
 
@@ -1259,7 +1271,7 @@ _cmux_stop_git_head_watch() {
 
 _cmux_start_git_head_watch() {
     [[ "${CMUX_NO_GIT_WATCH:-}" == "1" ]] && return 0
-    [[ -S "$CMUX_SOCKET_PATH" ]] || return 0
+    _cmux_has_port_scan_transport || return 0
     [[ -n "$CMUX_TAB_ID" ]] || return 0
     [[ -n "$CMUX_PANEL_ID" ]] || return 0
 
@@ -1419,11 +1431,15 @@ _cmux_precmd() {
         cmd_dur=$(( now - cmd_start ))
     fi
 
+    # On TCP-relay sockets (remote workspaces) the _cmux_send path routes
+    # through the cmuxd-remote `__v1` passthrough, so pwd/git/branch reports
+    # work the same as on a local Unix socket. Only the ports_kick scheduling
+    # is conditional on the transport — fall through to the unified report
+    # block below for both Unix and relay cases.
     if (( ! cmux_has_unix_socket )); then
         if (( cmd_dur >= 2 || now - _CMUX_PORTS_LAST_RUN >= 10 )); then
             _cmux_ports_kick refresh
         fi
-        return 0
     fi
 
     [[ -n "$CMUX_PANEL_ID" ]] || return 0

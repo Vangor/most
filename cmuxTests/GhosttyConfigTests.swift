@@ -3146,35 +3146,45 @@ final class SocketControlSettingsTests: XCTestCase {
         XCTAssertEqual(path, SocketControlSettings.userScopedStableSocketPath(currentUserID: 501))
     }
 
-    func testInitialStableLaunchDoesNotProbeSameUserStableSocketLiveness() {
+    func testInitialStableLaunchReclaimsStaleSameUserStableSocket() {
+        // A same-user socket left at the stable path by an unclean exit (crash / SIGKILL)
+        // has a free, reusable lock -> reclaimable. The launch must reuse the stable path
+        // so the CLI can keep finding `most.sock` instead of being stranded on the
+        // user-scoped fallback forever (the release "socket not found" regression).
+        var probedReclaimPath: String?
         let path = SocketControlSettings.initialSocketPathBeforeListenerStart(
             preferredPath: SocketControlSettings.stableDefaultSocketPath,
-            bundleIdentifier: "com.cmuxterm.app",
-            isDebugBuild: false,
-            currentUserID: 501,
-            probeStableDefaultPathEntry: { _ in .socket(ownerUserID: 501) },
-            stableDefaultSocketCanBeReclaimed: { _ in
-                XCTFail("Existing startup sockets should fall back without liveness probing on the main thread")
-                return true
-            }
-        )
-
-        XCTAssertEqual(path, SocketControlSettings.userScopedStableSocketPath(currentUserID: 501))
-    }
-
-    func testInitialStableLaunchDoesNotProbeSameUserStableSocketReclaimability() {
-        let path = SocketControlSettings.initialSocketPathBeforeListenerStart(
-            preferredPath: SocketControlSettings.stableDefaultSocketPath,
-            bundleIdentifier: "com.cmuxterm.app",
+            bundleIdentifier: "com.4etverg.most",
             isDebugBuild: false,
             currentUserID: 501,
             probeStableDefaultPathEntry: { _ in .socket(ownerUserID: 501) },
             stableDefaultSocketCanBeReclaimed: { socketPath in
-                XCTFail("Existing startup sockets should fall back without reclaimability probing: \(socketPath)")
+                probedReclaimPath = socketPath
+                return true
+            }
+        )
+
+        XCTAssertEqual(probedReclaimPath, SocketControlSettings.stableDefaultSocketPath)
+        XCTAssertEqual(path, SocketControlSettings.stableDefaultSocketPath)
+    }
+
+    func testInitialStableLaunchFallsBackWhenSameUserStableSocketIsLive() {
+        // A live sibling instance holds the socket-path lock -> not reclaimable. The new
+        // launch must coexist on the user-scoped path rather than stealing the live socket.
+        var probedReclaimPath: String?
+        let path = SocketControlSettings.initialSocketPathBeforeListenerStart(
+            preferredPath: SocketControlSettings.stableDefaultSocketPath,
+            bundleIdentifier: "com.4etverg.most",
+            isDebugBuild: false,
+            currentUserID: 501,
+            probeStableDefaultPathEntry: { _ in .socket(ownerUserID: 501) },
+            stableDefaultSocketCanBeReclaimed: { socketPath in
+                probedReclaimPath = socketPath
                 return false
             }
         )
 
+        XCTAssertEqual(probedReclaimPath, SocketControlSettings.stableDefaultSocketPath)
         XCTAssertEqual(path, SocketControlSettings.userScopedStableSocketPath(currentUserID: 501))
     }
 

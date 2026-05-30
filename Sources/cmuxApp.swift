@@ -4736,8 +4736,8 @@ nonisolated enum BuildFlavor: String, Sendable {
         if SocketControlSettings.isDebugLikeBundleIdentifier(normalizedBundleIdentifier) {
             return .dev
         }
-        if normalizedBundleIdentifier == "com.cmuxterm.app.nightly"
-            || normalizedBundleIdentifier?.hasPrefix("com.cmuxterm.app.nightly.") == true {
+        if normalizedBundleIdentifier == "com.4etverg.most.nightly"
+            || normalizedBundleIdentifier?.hasPrefix("com.4etverg.most.nightly.") == true {
             return .nightly
         }
         if bundleNames.contains(where: containsNightlyToken) {
@@ -5271,6 +5271,7 @@ struct SettingsView: View {
     @AppStorage(NotificationBadgeSettings.dockBadgeEnabledKey) private var notificationDockBadgeEnabled = NotificationBadgeSettings.defaultDockBadgeEnabled
     @AppStorage(NotificationPaneRingSettings.enabledKey) private var notificationPaneRingEnabled = NotificationPaneRingSettings.defaultEnabled
     @AppStorage(NotificationPaneFlashSettings.enabledKey) private var notificationPaneFlashEnabled = NotificationPaneFlashSettings.defaultEnabled
+    @AppStorage(ClaudeNotificationSettings.enabledKey) private var claudeStatusNotificationsEnabled = ClaudeNotificationSettings.defaultEnabled
     @AppStorage(MenuBarExtraSettings.showInMenuBarKey) private var showMenuBarExtra = MenuBarExtraSettings.defaultShowInMenuBar
     @AppStorage(MenuBarOnlySettings.menuBarOnlyKey) private var menuBarOnly = MenuBarOnlySettings.defaultMenuBarOnly
     @AppStorage(QuitWarningSettings.confirmQuitKey)
@@ -6516,6 +6517,21 @@ struct SettingsView: View {
                                 .controlSize(.small)
                                 .accessibilityLabel(
                                     String(localized: "settings.notifications.paneFlash.title", defaultValue: "Pane Flash")
+                                )
+                        }
+
+                        SettingsCardDivider()
+
+                        SettingsCardRow(
+                            configurationReview: .action,
+                            String(localized: "settings.notifications.claudeStatus", defaultValue: "Claude Status Notifications"),
+                            subtitle: String(localized: "settings.notifications.claudeStatus.subtitle", defaultValue: "Show desktop alerts for Claude needs-input and completion transitions.")
+                        ) {
+                            Toggle("", isOn: $claudeStatusNotificationsEnabled)
+                                .labelsHidden()
+                                .controlSize(.small)
+                                .accessibilityLabel(
+                                    String(localized: "settings.notifications.claudeStatus", defaultValue: "Claude Status Notifications")
                                 )
                         }
 

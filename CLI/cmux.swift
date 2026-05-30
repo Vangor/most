@@ -1354,7 +1354,7 @@ private enum TopTextFormat: Equatable {
 enum SocketPasswordResolver {
     private static let service = "com.cmuxterm.app.socket-control"
     private static let account = "local-socket-password"
-    private static let directoryName = "cmux"
+    private static let directoryName = "most"
     private static let fileName = "socket-control-password"
 
     static func resolve(explicit: String?, socketPath: String) -> String? {
@@ -2556,7 +2556,7 @@ struct CMUXCLI {
     }
 
     private static let browserDisabledDefaultsKey = "browserDisabledOverride"
-    private static let defaultBrowserSettingsDomain = "com.cmuxterm.app"
+    private static let defaultBrowserSettingsDomain = "com.4etverg.most"
 
     private static func containingAppBundleIdentifier() -> String? {
         normalizedEnvValue(CLIExecutableLocator.enclosingAppBundle()?.bundleIdentifier)
@@ -7475,6 +7475,7 @@ struct CMUXCLI {
         let zshLoginLines = zshBootstrap.zshLoginLines
         let bundledZshIntegration = bundledShellIntegrationScript(named: "cmux-zsh-integration.zsh")
         let bundledBashIntegration = bundledShellIntegrationScript(named: "cmux-bash-integration.bash")
+        let bundledClaudeWrapper = bundledClaudeWrapperScript()
         let bashRCLines = [
             "if [ -f \"$HOME/.bash_profile\" ]; then . \"$HOME/.bash_profile\"; elif [ -f \"$HOME/.bash_login\" ]; then . \"$HOME/.bash_login\"; elif [ -f \"$HOME/.profile\" ]; then . \"$HOME/.profile\"; fi",
             "[ -f \"$HOME/.bashrc\" ] && . \"$HOME/.bashrc\"",
@@ -7486,19 +7487,63 @@ struct CMUXCLI {
             "cmux_shell_dir=\"\(shellStateDir)\"",
             "mkdir -p \"$cmux_shell_dir\"",
         ]
+        // Shell-bundle files are gzip+base64 compressed to keep the single
+        // /bin/sh -c PTY command under Linux MAX_ARG_STRLEN (128 KB).
+        // Raw heredocs for zsh (~55 KB) + bash (~48 KB) + claude (~19 KB)
+        // totalled ~122 KB and exceeded the limit after commit 891937c4f.
+        // Compressed they are ~38 KB combined.  `base64 -d` and `gunzip`
+        // are universally present on Linux remotes.
         if let bundledZshIntegration {
-            outerLines += [
-                "cat > \"$cmux_shell_dir/cmux-zsh-integration.zsh\" <<'CMUXCMUXZSH'",
-                bundledZshIntegration,
-                "CMUXCMUXZSH",
-            ]
+            if let b64gz = gzipBase64(bundledZshIntegration) {
+                outerLines += [
+                    "base64 -d <<'CMUXCMUXZSH' | gunzip > \"$cmux_shell_dir/cmux-zsh-integration.zsh\"",
+                    b64gz,
+                    "CMUXCMUXZSH",
+                ]
+            } else {
+                outerLines += [
+                    "cat > \"$cmux_shell_dir/cmux-zsh-integration.zsh\" <<'CMUXCMUXZSH'",
+                    bundledZshIntegration,
+                    "CMUXCMUXZSH",
+                ]
+            }
         }
         if let bundledBashIntegration {
-            outerLines += [
-                "cat > \"$cmux_shell_dir/cmux-bash-integration.bash\" <<'CMUXCMUXBASH'",
-                bundledBashIntegration,
-                "CMUXCMUXBASH",
-            ]
+            if let b64gz = gzipBase64(bundledBashIntegration) {
+                outerLines += [
+                    "base64 -d <<'CMUXCMUXBASH' | gunzip > \"$cmux_shell_dir/cmux-bash-integration.bash\"",
+                    b64gz,
+                    "CMUXCMUXBASH",
+                ]
+            } else {
+                outerLines += [
+                    "cat > \"$cmux_shell_dir/cmux-bash-integration.bash\" <<'CMUXCMUXBASH'",
+                    bundledBashIntegration,
+                    "CMUXCMUXBASH",
+                ]
+            }
+        }
+        if let bundledClaudeWrapper {
+            // Deploy the cmux Claude wrapper so _cmux_install_claude_wrapper in the
+            // shell-integration scripts picks it up via $bundle_dir/bin/claude and
+            // installs the `claude()` shell function. This is what gives remote
+            // sreda sessions the same hook/--settings injection that local cmux
+            // workspace shells get.
+            outerLines += ["mkdir -p \"$cmux_shell_dir/bin\""]
+            if let b64gz = gzipBase64(bundledClaudeWrapper) {
+                outerLines += [
+                    "base64 -d <<'CMUXCLAUDEWRAPPER' | gunzip > \"$cmux_shell_dir/bin/claude\"",
+                    b64gz,
+                    "CMUXCLAUDEWRAPPER",
+                ]
+            } else {
+                outerLines += [
+                    "cat > \"$cmux_shell_dir/bin/claude\" <<'CMUXCLAUDEWRAPPER'",
+                    bundledClaudeWrapper,
+                    "CMUXCLAUDEWRAPPER",
+                ]
+            }
+            outerLines += ["chmod 755 \"$cmux_shell_dir/bin/claude\" >/dev/null 2>&1 || true"]
         }
         outerLines.append(contentsOf: commonShellExportLines)
         outerLines += [
@@ -7614,6 +7659,103 @@ struct CMUXCLI {
         }
 
         return nil
+    }
+
+    private func bundledClaudeWrapperScript() -> String? {
+        let fileManager = FileManager.default
+        var candidates: [URL] = []
+
+        if let executableURL = resolvedExecutableURL() {
+            // In an installed app bundle, the Copy CLI build phase places the
+            // `claude` wrapper next to the `cmux` executable (Contents/Resources/).
+            candidates.append(
+                executableURL.deletingLastPathComponent()
+                    .appendingPathComponent("claude", isDirectory: false)
+            )
+
+            var current = executableURL.deletingLastPathComponent().standardizedFileURL
+            while true {
+                if current.lastPathComponent == "Contents" {
+                    candidates.append(
+                        current
+                            .appendingPathComponent("Resources", isDirectory: true)
+                            .appendingPathComponent("bin", isDirectory: true)
+                            .appendingPathComponent("claude", isDirectory: false)
+                    )
+                    candidates.append(
+                        current
+                            .appendingPathComponent("Resources", isDirectory: true)
+                            .appendingPathComponent("claude", isDirectory: false)
+                    )
+                }
+
+                let projectMarker = current.appendingPathComponent("cmux.xcodeproj/project.pbxproj", isDirectory: false)
+                if fileManager.fileExists(atPath: projectMarker.path) {
+                    candidates.append(
+                        current
+                            .appendingPathComponent("Resources", isDirectory: true)
+                            .appendingPathComponent("bin", isDirectory: true)
+                            .appendingPathComponent("claude", isDirectory: false)
+                    )
+                    break
+                }
+
+                guard let parent = parentSearchURL(for: current) else {
+                    break
+                }
+                current = parent
+            }
+        }
+
+        if let resourceURL = Bundle.main.resourceURL {
+            candidates.append(
+                resourceURL
+                    .appendingPathComponent("bin", isDirectory: true)
+                    .appendingPathComponent("claude", isDirectory: false)
+            )
+            candidates.append(
+                resourceURL.appendingPathComponent("claude", isDirectory: false)
+            )
+        }
+
+        for url in candidates {
+            guard fileManager.fileExists(atPath: url.path),
+                  let data = try? Data(contentsOf: url),
+                  let contents = String(data: data, encoding: .utf8) else {
+                continue
+            }
+            return contents
+        }
+
+        return nil
+    }
+
+    /// Gzip-compress `content` (UTF-8) and return a base64 string suitable for
+    /// embedding in a remote bootstrap heredoc decoded with `base64 -d | gunzip`.
+    /// Falls back to `nil` on compression failure so callers can fall back to
+    /// the raw content path.
+    private func gzipBase64(_ content: String) -> String? {
+        guard let data = content.data(using: .utf8) else { return nil }
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/gzip")
+        process.arguments = ["-c", "-9"]
+        let inPipe = Pipe()
+        let outPipe = Pipe()
+        process.standardInput = inPipe
+        process.standardOutput = outPipe
+        process.standardError = FileHandle.nullDevice
+        do {
+            try process.run()
+        } catch {
+            return nil
+        }
+        inPipe.fileHandleForWriting.write(data)
+        try? inPipe.fileHandleForWriting.close()
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else { return nil }
+        let compressed = outPipe.fileHandleForReading.readDataToEndOfFile()
+        guard !compressed.isEmpty else { return nil }
+        return compressed.base64EncodedString()
     }
 
     func buildInteractiveRemoteShellCommand(

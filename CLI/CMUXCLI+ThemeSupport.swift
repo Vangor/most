@@ -340,30 +340,30 @@ extension CMUXCLI {
     private func bundleIdentifierForThemeReloadSocketPath(_ socketPath: String) -> String? {
         let name = URL(fileURLWithPath: socketPath).lastPathComponent
         switch name {
-        case "cmux.sock":
+        case "most.sock":
             return Self.cmuxThemeOverrideBundleIdentifier
         case "cmux-debug.sock":
-            return "com.cmuxterm.app.debug"
+            return "com.4etverg.most.debug"
         case "cmux-nightly.sock":
-            return "com.cmuxterm.app.nightly"
+            return "com.4etverg.most.nightly"
         case "cmux-staging.sock":
-            return "com.cmuxterm.app.staging"
+            return "com.4etverg.most.staging"
         default:
             break
         }
 
-        if name.range(of: #"^cmux-\d+\.sock$"#, options: .regularExpression) != nil {
+        if name.range(of: #"^most-\d+\.sock$"#, options: .regularExpression) != nil {
             return Self.cmuxThemeOverrideBundleIdentifier
         }
 
         if let slug = themeReloadSocketSlug(name, prefix: "cmux-debug-", suffix: ".sock") {
-            return "com.cmuxterm.app.debug.\(slug)"
+            return "com.4etverg.most.debug.\(slug)"
         }
         if let slug = themeReloadSocketSlug(name, prefix: "cmux-nightly-", suffix: ".sock") {
-            return "com.cmuxterm.app.nightly.\(slug)"
+            return "com.4etverg.most.nightly.\(slug)"
         }
         if let slug = themeReloadSocketSlug(name, prefix: "cmux-staging-", suffix: ".sock") {
-            return "com.cmuxterm.app.staging.\(slug)"
+            return "com.4etverg.most.staging.\(slug)"
         }
         return nil
     }

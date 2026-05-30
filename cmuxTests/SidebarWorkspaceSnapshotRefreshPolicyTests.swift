@@ -108,6 +108,7 @@ final class SidebarWorkspaceSnapshotRefreshPolicyTests: XCTestCase {
             remoteStateHelpText: "",
             copyableSidebarSSHError: nil,
             latestConversationMessage: latestConversationMessage,
+            claudeStatusBadge: nil,
             metadataEntries: [],
             metadataBlocks: [],
             latestLog: nil,

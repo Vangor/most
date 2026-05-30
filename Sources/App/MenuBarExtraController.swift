@@ -694,19 +694,46 @@ enum MenuBarIconRenderer {
         image.lockFocus()
         defer { image.unlockFocus() }
 
-        let glyphRect = NSRect(x: 1.2, y: 1.5, width: 11.6, height: 15.0)
+        // Use the full image bounds for the glyph, then nudge ~1pt right and
+        // ~1pt down to match the optical balance of the neighboring system
+        // menubar icons (Wi-Fi, Bluetooth, Battery), which sit slightly low-
+        // and right- of dead-center on a 16-18pt status item. lockFocus uses
+        // bottom-left origin coordinates so reducing y shifts the glyph down
+        // visually.
+        let glyphRect = NSRect(x: 0.8, y: -0.8, width: size.width, height: size.height)
         drawGlyph(in: glyphRect)
 
         if let text = badgeText {
-            drawBadge(text: text, in: config.badgeRect, config: config)
+            drawCircleBadge(text: text, in: config.badgeRect, config: config)
         }
 
-        image.isTemplate = true
+        // Template rendering tints the entire image to match the menubar
+        // appearance — fine for the plain glyph, but it would swallow the
+        // colored circle + white number badge. Switch to non-template when
+        // there's a badge to draw so the blue/white survives.
+        image.isTemplate = (badgeText == nil)
         return image
     }
 
     private static func drawGlyph(in rect: NSRect) {
-        // Match the canonical cmux center-mark path from Icon Center Image Artwork.svg.
+        // Draw the most paper-plane + bridge mark from the bundled menubar
+        // image asset. Falls back to the legacy cmux center-mark path if the
+        // asset can't be loaded (defensive — the asset ships in
+        // Assets.xcassets/MenubarIcon).
+        if let icon = NSImage(named: "MenubarIcon") {
+            icon.isTemplate = true
+            icon.draw(
+                in: rect,
+                from: .zero,
+                operation: .sourceOver,
+                fraction: 1.0,
+                respectFlipped: true,
+                hints: nil
+            )
+            return
+        }
+
+        // Fallback to the historical cmux center-mark path.
         let srcMinX: CGFloat = 384.0
         let srcMinY: CGFloat = 255.0
         let srcWidth: CGFloat = 369.0
@@ -732,6 +759,36 @@ enum MenuBarIconRenderer {
 
         NSColor.black.setFill()
         path.fill()
+    }
+
+    private static func drawCircleBadge(text: String, in rect: NSRect, config: MenuBarBadgeRenderConfig) {
+        // Filled blue circle (slightly inflated to host single- and multi-
+        // digit text comfortably), then white digits on top.
+        let inflation: CGFloat = 1.0
+        let circleRect = rect.insetBy(dx: -inflation, dy: -inflation)
+        let circle = NSBezierPath(ovalIn: circleRect)
+        NSColor.systemBlue.setFill()
+        circle.fill()
+
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.alignment = .center
+        let fontSize: CGFloat = text.count > 1
+            ? max(config.multiDigitFontSize - 0.5, 6.0)
+            : max(config.singleDigitFontSize - 0.5, 7.0)
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: fontSize, weight: .bold),
+            .foregroundColor: NSColor.white,
+            .paragraphStyle: paragraph,
+        ]
+        let attributed = NSAttributedString(string: text, attributes: attrs)
+        let textSize = attributed.size()
+        let textRect = NSRect(
+            x: circleRect.midX - textSize.width / 2.0,
+            y: circleRect.midY - textSize.height / 2.0,
+            width: textSize.width,
+            height: textSize.height
+        )
+        attributed.draw(in: textRect)
     }
 
     private static func drawBadge(text: String, in rect: NSRect, config: MenuBarBadgeRenderConfig) {

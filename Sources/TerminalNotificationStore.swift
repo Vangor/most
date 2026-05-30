@@ -567,6 +567,18 @@ enum NotificationBadgeSettings {
     }
 }
 
+enum ClaudeNotificationSettings {
+    static let enabledKey = "claudeStatusNotificationsEnabled"
+    static let defaultEnabled = true
+
+    static func isEnabled(defaults: UserDefaults = .standard) -> Bool {
+        if defaults.object(forKey: enabledKey) == nil {
+            return defaultEnabled
+        }
+        return defaults.bool(forKey: enabledKey)
+    }
+}
+
 enum NotificationPaneRingSettings {
     static let enabledKey = "notificationPaneRingEnabled"
     static let defaultEnabled = true
@@ -1252,6 +1264,50 @@ final class TerminalNotificationStore: ObservableObject {
                 )
                 self.reportNotificationHookFailure(failure)
             }
+        }
+    }
+
+    func addClaudeStatusNotification(
+        tabId: UUID,
+        surfaceId: UUID? = nil,
+        title: String,
+        body: String,
+        state: WorkspaceClaudeStatusBadge.State
+    ) {
+        guard ClaudeNotificationSettings.isEnabled() else { return }
+        let normalizedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedBody = Self.normalizeSingleLineNotificationText(body)
+        guard !normalizedTitle.isEmpty, !normalizedBody.isEmpty else { return }
+
+        let cooldownKey = "claude:\(tabId.uuidString):\(state.rawValue):\(normalizedBody)"
+        let notificationBody = Self.claudeNotificationBody(for: state, text: normalizedBody)
+        addNotification(
+            tabId: tabId,
+            surfaceId: surfaceId,
+            title: normalizedTitle,
+            subtitle: "",
+            body: notificationBody,
+            cooldownKey: cooldownKey,
+            cooldownInterval: 30
+        )
+    }
+
+    private static func normalizeSingleLineNotificationText(_ text: String) -> String {
+        text
+            .replacingOccurrences(of: "\r", with: " ")
+            .replacingOccurrences(of: "\n", with: " ")
+            .replacingOccurrences(of: "\t", with: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func claudeNotificationBody(for state: WorkspaceClaudeStatusBadge.State, text: String) -> String {
+        switch state {
+        case .waiting:
+            return text
+        case .idle:
+            return text
+        case .busy, .shell:
+            return text
         }
     }
 

@@ -13774,6 +13774,7 @@ struct SidebarWorkspaceSnapshotBuilder {
         let remoteStateHelpText: String
         let copyableSidebarSSHError: String?
         let latestConversationMessage: String?
+        let claudeStatusBadge: WorkspaceClaudeStatusBadge?
         let metadataEntries: [SidebarStatusEntry]
         let metadataBlocks: [SidebarMetadataBlock]
         let latestLog: SidebarLogEntry?
@@ -14106,27 +14107,10 @@ private struct TabItemView: View, Equatable {
 
     @ViewBuilder
     private var remoteWorkspaceSection: some View {
-        let workspaceSnapshot = self.workspaceSnapshot
-        if !settings.hidesAllDetails, sidebarShowSSH, let remoteWorkspaceSidebarText = workspaceSnapshot.remoteWorkspaceSidebarText {
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    Text(remoteWorkspaceSidebarText)
-                        .font(.system(size: 10, design: .monospaced))
-                        .foregroundColor(activeSecondaryColor(0.8))
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-
-                    Spacer(minLength: 0)
-
-                    Text(workspaceSnapshot.remoteConnectionStatusText)
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundColor(activeSecondaryColor(0.58))
-                        .lineLimit(1)
-                }
-            }
-            .padding(.top, latestNotificationText == nil ? 1 : 2)
-            .safeHelp(workspaceSnapshot.remoteStateHelpText)
-        }
+        // The remote SSH indicator now lives next to the workspace title as a
+        // compact colored dot — the hostname text + status row was redundant
+        // once the title-row dot conveyed the same information at a glance.
+        EmptyView()
     }
 
     private func copyWorkspaceIdsToPasteboard(_ ids: [UUID], includeRefs: Bool = false) {
@@ -14201,8 +14185,39 @@ private struct TabItemView: View, Equatable {
                     .lineLimit(settings.wrapsWorkspaceTitles ? nil : 1)
                     .truncationMode(.tail)
                     .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
                     .layoutPriority(1)
+
+                if sidebarShowSSH, workspaceSnapshot.remoteWorkspaceSidebarText != nil {
+                    let sshState = tab.remoteConnectionState
+                    let sshDotColor: Color = {
+                        switch sshState {
+                        case .connected: return Color.white
+                        case .connecting, .reconnecting: return Color(red: 1.0, green: 0.82, blue: 0.35)
+                        case .error: return Color(red: 1.0, green: 0.45, blue: 0.45)
+                        case .disconnected: return Color.white.opacity(0.35)
+                        }
+                    }()
+                    // Embed the dot inside a text-baseline-sized frame so
+                    // HStack's default centeredAlignment lines the circle up
+                    // with the workspace title's optical center instead of
+                    // sitting on top of the line.
+                    Circle()
+                        .fill(sshDotColor)
+                        .frame(width: 6, height: 6)
+                        .frame(height: 14, alignment: .center)
+                        .accessibilityLabel(workspaceSnapshot.remoteConnectionStatusText)
+                        .safeHelp(workspaceSnapshot.remoteStateHelpText ?? workspaceSnapshot.remoteConnectionStatusText)
+                }
+
+                Spacer(minLength: 0)
+
+                if let claudeStatusBadge = workspaceSnapshot.claudeStatusBadge {
+                    SidebarClaudeStatusBadgeView(
+                        status: claudeStatusBadge,
+                        isActive: usesInvertedActiveForeground,
+                        activeForegroundColor: activePrimaryTextColor
+                    )
+                }
             }
 
             if let description = workspaceSnapshot.customDescription {
@@ -15188,6 +15203,7 @@ private struct TabItemView: View, Equatable {
             remoteStateHelpText: remoteStateHelpText,
             copyableSidebarSSHError: copyableSidebarSSHError,
             latestConversationMessage: tab.latestConversationMessage,
+            claudeStatusBadge: tab.claudeStatusBadge,
             metadataEntries: detailVisibility.showsMetadata ? tab.sidebarStatusEntriesInDisplayOrder() : [],
             metadataBlocks: detailVisibility.showsMetadata ? tab.sidebarMetadataBlocksInDisplayOrder() : [],
             latestLog: detailVisibility.showsLog ? tab.logEntries.last : nil,
@@ -15291,7 +15307,12 @@ private struct TabItemView: View, Equatable {
             let directoryCandidates: [String] = {
                 guard let directory = entry.directory else { return [] }
                 if useViewportAwarePath {
-                    return SidebarPathFormatter.pathCandidates(directory, homeDirectoryPath: home)
+                    // sidebarPathLastSegmentOnly=true: show only the basename so the
+                    // pill always reads "lingualex" not "~/Git/lingualex".
+                    // pathCandidates would give ViewThatFits a full-path option that it
+                    // picks whenever the row is wide enough, defeating the setting.
+                    let last = SidebarPathFormatter.lastSegmentPath(directory, homeDirectoryPath: home)
+                    return last.isEmpty ? [] : [last]
                 }
                 let shortened = SidebarPathFormatter.shortenedPath(directory, homeDirectoryPath: home)
                 return shortened.isEmpty ? [] : [shortened]
@@ -15329,27 +15350,14 @@ private struct TabItemView: View, Equatable {
             return joined.isEmpty ? [] : [joined]
         }
 
-        let perDirectoryCandidates: [[String]] = directories
-            .map { SidebarPathFormatter.pathCandidates($0, homeDirectoryPath: home) }
+        // sidebarPathLastSegmentOnly=true: show only the basename for each panel,
+        // joined with " | ".  A single fixed string is correct here — no gradient of
+        // candidates needed because the display width is not the deciding factor.
+        let joined = directories
+            .map { SidebarPathFormatter.lastSegmentPath($0, homeDirectoryPath: home) }
             .filter { !$0.isEmpty }
-        guard !perDirectoryCandidates.isEmpty else { return [] }
-
-        var indices = Array(repeating: 0, count: perDirectoryCandidates.count)
-        var result: [String] = []
-        while true {
-            let pieces = zip(indices, perDirectoryCandidates).map { idx, candidates in
-                candidates[idx]
-            }
-            let joined = pieces.joined(separator: " | ")
-            if !joined.isEmpty, result.last != joined {
-                result.append(joined)
-            }
-            guard let bumpIdx = indices.indices.last(where: { indices[$0] < perDirectoryCandidates[$0].count - 1 }) else {
-                break
-            }
-            indices[bumpIdx] += 1
-        }
-        return result
+            .joined(separator: " | ")
+        return joined.isEmpty ? [] : [joined]
     }
 
     private func pullRequestDisplays(orderedPanelIds: [UUID]) -> [SidebarWorkspaceSnapshotBuilder.PullRequestDisplay] {
@@ -15767,6 +15775,96 @@ private struct SidebarMetadataRows: View {
 
     private var shouldShowToggle: Bool {
         entries.count > collapsedEntryLimit
+    }
+}
+
+private struct SidebarClaudeStatusBadgeView: View {
+    let status: WorkspaceClaudeStatusBadge
+    let isActive: Bool
+    let activeForegroundColor: Color
+    @State private var now = Date()
+
+    var body: some View {
+        HStack(spacing: 3) {
+            Image(systemName: iconName)
+                .font(.system(size: 8, weight: .semibold))
+            Text(label)
+                .font(.system(size: 9, weight: .semibold))
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+        }
+        .foregroundColor(foregroundColor)
+        .padding(.horizontal, 5)
+        .frame(height: 16)
+        .background(Capsule().fill(foregroundColor.opacity(isActive ? 0.18 : 0.14)))
+        .safeHelp(helpText)
+        .onReceive(Timer.publish(every: 60, on: .main, in: .common).autoconnect()) { value in
+            now = value
+        }
+    }
+
+    private var iconName: String {
+        switch status.state {
+        case .busy:
+            return "arrow.triangle.2.circlepath"
+        case .shell:
+            return "terminal.fill"
+        case .waiting:
+            return "exclamationmark"
+        case .idle:
+            return "pause.fill"
+        }
+    }
+
+    private var label: String {
+        switch status.state {
+        case .busy:
+            return String(localized: "sidebar.claudeStatus.busy", defaultValue: "work")
+        case .shell:
+            return String(localized: "sidebar.claudeStatus.shell", defaultValue: "shell")
+        case .waiting:
+            return String(localized: "sidebar.claudeStatus.waiting", defaultValue: "input")
+        case .idle:
+            return idleAgeLabel
+        }
+    }
+
+    private var idleAgeLabel: String {
+        guard let lastBusyAt = status.lastBusyAt else {
+            return String(localized: "sidebar.claudeStatus.idle", defaultValue: "idle")
+        }
+        let elapsed = max(0, now.timeIntervalSince(lastBusyAt))
+        let minutes = Int(elapsed / 60)
+        if minutes < 60 {
+            return "\(max(1, minutes))m"
+        }
+        let hours = minutes / 60
+        if hours < 24 {
+            return "\(hours)h"
+        }
+        return "\(hours / 24)d"
+    }
+
+    private var foregroundColor: Color {
+        switch status.state {
+        case .waiting:
+            return Color(hex: "#f38ba8") ?? .red
+        case .busy, .shell, .idle:
+            return isActive ? activeForegroundColor : cmuxAccentColor()
+        }
+    }
+
+    private var helpText: String {
+        switch status.state {
+        case .busy:
+            return String(localized: "sidebar.claudeStatus.busy.help", defaultValue: "Claude is working")
+        case .shell:
+            return String(localized: "sidebar.claudeStatus.shell.help", defaultValue: "Claude is at a shell")
+        case .waiting:
+            return String(localized: "sidebar.claudeStatus.waiting.help", defaultValue: "Claude needs input")
+        case .idle:
+            return String(localized: "sidebar.claudeStatus.idle.help", defaultValue: "Claude is idle")
+        }
     }
 }
 

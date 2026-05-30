@@ -5,6 +5,7 @@ import (
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -209,6 +210,35 @@ doneFlags:
 		return runTmuxCompat(socketPath, cmdArgs, refreshAddr)
 	}
 
+	// Raw v1 passthrough used by the shell-integration script's _cmux_send
+	// when the socket is a TCP relay (host:port) instead of a Unix domain
+	// socket file. The shell integration's direct zsocket/ncat -U paths
+	// only work for Unix sockets, so on remote workspaces it falls back
+	// to invoking this subcommand. The payload is everything after `__v1`
+	// joined by single spaces, sent as one line on the relay.
+	if cmdName == "__v1" {
+		payload := strings.Join(cmdArgs, " ")
+		if payload == "" {
+			return 0
+		}
+		if _, err := socketRoundTrip(socketPath, payload, refreshAddr); err != nil {
+			fmt.Fprintf(os.Stderr, "cmux __v1: %v\n", err)
+			return 1
+		}
+		return 0
+	}
+
+	// Claude wrapper hook subcommands. The Mac-side `cmux hooks claude <event>`
+	// (and the legacy `cmux claude-hook <event>`) implement sidebar
+	// status/pills/feed telemetry by talking to the local cmux app socket.
+	// The remote shim cannot do that itself, so it forwards stdin + argv
+	// + relevant CMUX_* env to the Mac via the `claude_hook.relay` RPC,
+	// where the Mac daemon spawns its bundled cmux CLI with the captured
+	// stdin/env to invoke runClaudeHook in its native environment.
+	if cmdName == "hooks" || cmdName == "claude-hook" {
+		return runClaudeHookRelay(socketPath, cmdName, cmdArgs, refreshAddr)
+	}
+
 	spec, ok := commandIndex[cmdName]
 	if !ok {
 		fmt.Fprintf(os.Stderr, "cmux: unknown command %q\n", cmdName)
@@ -324,6 +354,83 @@ func runRPC(socketPath string, args []string, jsonOutput bool, refreshAddr func(
 	}
 	fmt.Println(resp)
 	return 0
+}
+
+// runClaudeHookRelay forwards `cmux hooks claude <event>` (and the legacy
+// `cmux claude-hook <event>`) to the Mac-side daemon via the claude_hook.relay
+// RPC. It captures stdin (the JSON payload that Claude pipes into every hook
+// command) and the env vars runClaudeHook relies on to identify the workspace
+// and surface, then sends the whole thing across the relay socket. The Mac
+// daemon spawns its bundled cmux CLI as a subprocess with that exact stdin and
+// env so runClaudeHook executes in its native environment and can update the
+// sidebar pill / status / feed telemetry through the local app socket.
+func runClaudeHookRelay(socketPath, cmdName string, cmdArgs []string, refreshAddr func() string) int {
+	stdinBytes, _ := io.ReadAll(os.Stdin)
+	argv := append([]string{cmdName}, cmdArgs...)
+
+	// Capture only the env keys runClaudeHook actually consults. We don't
+	// forward the whole environment because it would override the Mac
+	// app's own runtime env.
+	//
+	// CMUX_CLAUDE_PID and CMUX_CLAUDE_HOOK_CMUX_BIN are deliberately NOT
+	// forwarded: the PID belongs to the remote (sreda) process tree, so
+	// the Mac-side stale-session detector that runs `kill -0` on the
+	// recorded PID would always conclude the process is dead and clear
+	// the sidebar pill after a few seconds. The HOOK_CMUX_BIN env points
+	// at the remote shim which would never resolve to a real binary on
+	// the Mac. Both are safe to omit — runClaudeHook treats their
+	// absence as "no PID/wrapper context" and skips the stale check.
+	envKeys := []string{
+		"CMUX_WORKSPACE_ID",
+		"CMUX_TAB_ID",
+		"CMUX_SURFACE_ID",
+		"CMUX_PANEL_ID",
+		"CMUX_AGENT_LAUNCH_KIND",
+		"CMUX_AGENT_LAUNCH_EXECUTABLE",
+		"CMUX_AGENT_LAUNCH_ARGV_B64",
+		"CMUX_AGENT_LAUNCH_CWD",
+		"CMUX_CLAUDE_HOOKS_DISABLED",
+		"CLAUDECODE",
+		"CLAUDE_PROJECT_DIR",
+		"PWD",
+	}
+	envOverrides := make(map[string]string, len(envKeys))
+	for _, key := range envKeys {
+		if value, ok := os.LookupEnv(key); ok && value != "" {
+			envOverrides[key] = value
+		}
+	}
+
+	params := map[string]any{
+		"argv":      argv,
+		"stdin_b64": base64.StdEncoding.EncodeToString(stdinBytes),
+		"env":       envOverrides,
+	}
+
+	resp, err := socketRoundTripV2(socketPath, "claude_hook.relay", params, refreshAddr)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "cmux %s: relay failed: %v\n", cmdName, err)
+		return 1
+	}
+
+	// Response shape: {"exit_code": int, "stdout": str, "stderr": str}
+	var result struct {
+		ExitCode int    `json:"exit_code"`
+		Stdout   string `json:"stdout"`
+		Stderr   string `json:"stderr"`
+	}
+	if err := json.Unmarshal([]byte(resp), &result); err != nil {
+		// Malformed relay response — treat as success so Claude doesn't
+		// block on a transport hiccup.
+		return 0
+	}
+	if result.Stdout != "" {
+		_, _ = os.Stdout.Write([]byte(result.Stdout))
+	}
+	if result.Stderr != "" {
+		_, _ = os.Stderr.Write([]byte(result.Stderr))
+	}
+	return result.ExitCode
 }
 
 // runBrowserRelay handles "cmux browser <subcommand>" by mapping to browser.* v2 methods.

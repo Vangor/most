@@ -3491,6 +3491,8 @@ class TerminalController {
             return v2Result(id: id, self.v2SurfaceReportTTY(params: params))
         case "surface.report_shell_state":
             return v2Result(id: id, self.v2SurfaceReportShellState(params: params))
+        case "claude_hook.relay":
+            return v2Result(id: id, self.v2ClaudeHookRelay(params: params))
         case "surface.ports_kick":
             return v2Result(id: id, self.v2SurfacePortsKick(params: params))
         case "surface.clear_history":
@@ -10278,6 +10280,134 @@ class TerminalController {
     }
 
     // MARK: - V2 Notification Methods
+
+    // Relay a `cmux hooks claude <event>` (or `cmux claude-hook <event>`) call
+    // from a remote (cmuxd-remote) workspace. The remote shim cannot run the
+    // Swift CLI's runClaudeHook directly because it talks to the local cmux
+    // app socket — so it forwards stdin + argv + a captured slice of env to
+    // this method, and the Mac side spawns the bundled cmux CLI as a
+    // subprocess with that exact stdin/env. The subprocess uses its own
+    // local socket round-trip to update workspace state.
+    //
+    // The handler returns success the moment the subprocess is launched —
+    // it does NOT wait for it. The spawned cmux makes its own RPCs back into
+    // this same daemon (set_agent_pid, surface.resume.set, feed.push, …) so
+    // blocking the v2 dispatch thread on subprocess exit would deadlock
+    // against the daemon's own queue. Hook events are advisory state
+    // updates; the wrapper's HOOKS_JSON already sets per-event timeouts on
+    // Claude's side, so fire-and-forget is the right policy here.
+    private func v2ClaudeHookRelay(params: [String: Any]) -> V2CallResult {
+        guard let argv = params["argv"] as? [String], !argv.isEmpty else {
+            return .err(code: "invalid_params", message: "argv required", data: nil)
+        }
+        let stdinB64 = (params["stdin_b64"] as? String) ?? ""
+        let stdinData: Data
+        if stdinB64.isEmpty {
+            stdinData = Data()
+        } else if let decoded = Data(base64Encoded: stdinB64) {
+            stdinData = decoded
+        } else {
+            return .err(code: "invalid_params", message: "stdin_b64 not valid base64", data: nil)
+        }
+        let envOverrides = (params["env"] as? [String: String]) ?? [:]
+
+        guard let cmuxURL = Bundle.main.resourceURL?
+            .appendingPathComponent("bin/cmux", isDirectory: false),
+              FileManager.default.isExecutableFile(atPath: cmuxURL.path) else {
+            return .err(code: "unavailable", message: "bundled cmux CLI not found", data: nil)
+        }
+
+        var env = ProcessInfo.processInfo.environment
+        // Strip any inherited socket path that might point at a different app
+        // instance (e.g. production cmux.app's socket inherited from the shell
+        // that launched this app). The hook subprocess must talk back to THIS
+        // app's own listener, not whatever CMUX_SOCKET_PATH the process tree
+        // happened to inherit. activeSocketPath returns the actually-bound path
+        // (snapshot.socketPath when the listener is running), falling back to
+        // the configured preferred path if the listener hasn't started yet.
+        env.removeValue(forKey: "CMUX_SOCKET")
+        env.removeValue(forKey: "CMUX_SOCKET_PATH")
+        env["CMUX_SOCKET_PATH"] = activeSocketPath(preferredPath: socketPath)
+        // Remote-workspace identity overrides take precedence so runClaudeHook
+        // sees the remote workspace context, not the app's own ambient env.
+        // (envOverrides never contains a socket path, so the explicit binding
+        // above is preserved.)
+        for (key, value) in envOverrides where !value.isEmpty {
+            env[key] = value
+        }
+
+        // Dispatch the subprocess on a background queue so the v2 dispatcher
+        // thread can keep servicing the daemon socket — including the RPCs
+        // this very subprocess is about to issue.
+        DispatchQueue.global(qos: .utility).async {
+            let process = Process()
+            process.executableURL = cmuxURL
+            process.arguments = argv
+            process.environment = env
+            let stdinPipe = Pipe()
+            let stdoutPipe = Pipe()
+            let stderrPipe = Pipe()
+            process.standardInput = stdinPipe
+            process.standardOutput = stdoutPipe
+            process.standardError = stderrPipe
+
+            do {
+                try process.run()
+            } catch {
+                NSLog("[claude_hook.relay] failed to spawn cmux: \(error)")
+                return
+            }
+
+            if !stdinData.isEmpty {
+                try? stdinPipe.fileHandleForWriting.write(contentsOf: stdinData)
+            }
+            try? stdinPipe.fileHandleForWriting.close()
+
+            // Drain output asynchronously so the subprocess can't stall on a
+            // full pipe buffer while we wait for it. Append both streams to
+            // /tmp/cmux-claude-hook-relay.log so we can diagnose pill
+            // disappearance and other late-arriving misbehavior without
+            // reaching for Sentry / cloud telemetry.
+            let logURL = URL(fileURLWithPath: "/tmp/cmux-claude-hook-relay.log")
+            DispatchQueue.global(qos: .utility).async {
+                let data = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
+                if !data.isEmpty {
+                    let header = "[\(Date()) STDOUT argv=\(argv.joined(separator: " "))]\n".data(using: .utf8) ?? Data()
+                    if let fh = try? FileHandle(forWritingTo: logURL) {
+                        fh.seekToEndOfFile(); fh.write(header); fh.write(data); fh.write("\n".data(using: .utf8) ?? Data()); try? fh.close()
+                    } else {
+                        try? (header + data + Data("\n".utf8)).write(to: logURL)
+                    }
+                }
+            }
+            DispatchQueue.global(qos: .utility).async {
+                let data = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+                if !data.isEmpty {
+                    let header = "[\(Date()) STDERR argv=\(argv.joined(separator: " "))]\n".data(using: .utf8) ?? Data()
+                    if let fh = try? FileHandle(forWritingTo: logURL) {
+                        fh.seekToEndOfFile(); fh.write(header); fh.write(data); fh.write("\n".data(using: .utf8) ?? Data()); try? fh.close()
+                    } else {
+                        try? (header + data + Data("\n".utf8)).write(to: logURL)
+                    }
+                }
+            }
+            process.waitUntilExit()
+            // Always log the exit code so we can see hooks even with empty output.
+            let exitLine = "[\(Date()) EXIT rc=\(process.terminationStatus) argv=\(argv.joined(separator: " "))]\n"
+            if let fh = try? FileHandle(forWritingTo: logURL) {
+                fh.seekToEndOfFile(); fh.write(exitLine.data(using: .utf8) ?? Data()); try? fh.close()
+            } else {
+                try? exitLine.data(using: .utf8)?.write(to: logURL)
+            }
+        }
+
+        return .ok([
+            "exit_code": 0,
+            "stdout": "",
+            "stderr": "",
+            "dispatched": true,
+        ])
+    }
 
     private func v2NotificationCreate(params: [String: Any]) -> V2CallResult {
         guard let tabManager = v2ResolveTabManager(params: params) else {
@@ -19469,6 +19599,9 @@ class TerminalController {
                 format: format,
                 timestamp: Date()
             )
+            if let entry = tab.statusEntries[key] {
+                tab.syncClaudeStatusBadge(from: entry)
+            }
             if let pidValue {
                 tab.recordAgentPID(key: key, pid: pidValue, panelId: panelResolution.panelId)
             }
@@ -19489,10 +19622,13 @@ class TerminalController {
 
         scheduleSidebarMutation(target: target) { _, tab in
             _ = tab.statusEntries.removeValue(forKey: key)
+            tab.clearClaudeStatusBadge(forStatusKey: key)
             tab.clearAgentPID(key: key)
         }
         return "OK"
     }
+
+    // MARK: Claude hook socket state arrival
 
     /// Register an agent PID for stale-session detection without setting a visible status entry.
     /// Usage: set_agent_pid <key> <pid> [--tab=<id>] [--panel=<id>]
@@ -19564,7 +19700,18 @@ class TerminalController {
             if let panelId = panelResolution.panelId, !tab.panels.keys.contains(panelId) {
                 return
             }
+            let claudeNotification = tab.claudeStatusNotification(fromLifecycleKey: key, lifecycle: lifecycle)
             tab.setAgentLifecycle(key: key, panelId: panelResolution.panelId, lifecycle: lifecycle)
+            tab.syncClaudeStatusBadge(fromLifecycleKey: key, lifecycle: lifecycle)
+            if let claudeNotification {
+                TerminalNotificationStore.shared.addClaudeStatusNotification(
+                    tabId: tab.id,
+                    surfaceId: panelResolution.panelId,
+                    title: claudeNotification.title,
+                    body: claudeNotification.body,
+                    state: claudeNotification.state
+                )
+            }
         }
         return "OK"
     }
@@ -19637,6 +19784,9 @@ class TerminalController {
                 panelId: panelResolution.panelId,
                 clearStatus: parsed.options["clear-status"] != nil
             )
+            if parsed.options["clear-status"] != nil {
+                tab.clearClaudeStatusBadge(forStatusKey: key)
+            }
         }
         return "OK"
     }

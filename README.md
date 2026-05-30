@@ -1,365 +1,118 @@
-<h1 align="center">most</h1>
-<p align="center">A Ghostty-based macOS terminal with vertical tabs and notifications for AI coding agents</p>
+# most
 
-<p align="center">
-  <a href="https://github.com/manaflow-ai/cmux/releases/latest/download/cmux-macos.dmg">
-    <img src="./docs/assets/macos-badge.png" alt="Download most for macOS" width="180" />
-  </a>
-</p>
+> **мост** (Russian) — *bridge*: Mac ↔ remote server, you ↔ every project, you ↔ every Claude session.
 
-<p align="center">
-  English | <a href="README.ja.md">日本語</a> | <a href="README.vi.md">Tiếng Việt</a> | <a href="README.zh-CN.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ko.md">한국어</a> | <a href="README.de.md">Deutsch</a> | <a href="README.es.md">Español</a> | <a href="README.fr.md">Français</a> | <a href="README.it.md">Italiano</a> | <a href="README.da.md">Dansk</a> | <a href="README.pl.md">Polski</a> | <a href="README.ru.md">Русский</a> | <a href="README.bs.md">Bosanski</a> | <a href="README.ar.md">العربية</a> | <a href="README.no.md">Norsk</a> | <a href="README.pt-BR.md">Português (Brasil)</a> | <a href="README.th.md">ไทย</a> | <a href="README.tr.md">Türkçe</a> | <a href="README.km.md">ភាសាខ្មែរ</a> | <a href="README.uk.md">Українська</a>
-</p>
+`most` is a personal fork of [cmux](https://github.com/manaflow-ai/cmux), a GPU-accelerated macOS terminal built on [Ghostty](https://github.com/ghostty-org/ghostty). It adds in-app Claude session status, deep remote-workspace integration over SSH, and a handful of robustness fixes — all under the `com.4etverg.most` bundle ID so it coexists with a production cmux install.
 
-<p align="center">
-  <a href="https://x.com/manaflowai"><img src="https://img.shields.io/badge/@manaflow-555?logo=x" alt="X / Twitter" /></a>
-  <a href="https://discord.gg/xsgFEVrWCZ"><img src="https://img.shields.io/badge/Discord-555?logo=discord" alt="Discord" /></a>
-  <a href="https://github.com/manaflow-ai/cmux"><img src="https://img.shields.io/github/stars/manaflow-ai/cmux?style=flat&logo=github&label=stars&color=4c71f2" alt="GitHub stars" /></a>
-</p>
+<!-- screenshot: app icon -->
+<!-- screenshot: menubar glyph + badge -->
 
-<p align="center">
-  <img src="./docs/assets/main-first-image.png" alt="most screenshot" width="900" />
-</p>
+---
 
-<p align="center">
-  <a href="https://www.youtube.com/watch?v=i-WxO5YUTOs">▶ Demo video</a> · <a href="https://cmux.com/blog/zen-of-cmux">The Zen of most</a>
-</p>
+## Why this fork exists
 
-## Features
+cmux is a great terminal, but the Claude-coding workflow needed two things it doesn't have out of the box:
 
-<table>
-<tr>
-<td width="40%" valign="middle">
-<h3>Notification rings</h3>
-Panes get a blue ring and tabs light up when coding agents need your attention
-</td>
-<td width="60%">
-<img src="./docs/assets/notification-rings.png" alt="Notification rings" width="100%" />
-</td>
-</tr>
-<tr>
-<td width="40%" valign="middle">
-<h3>Notification panel</h3>
-See all pending notifications in one place, jump to the most recent unread
-</td>
-<td width="60%">
-<img src="./docs/assets/sidebar-notification-badge.png" alt="Sidebar notification badge" width="100%" />
-</td>
-</tr>
-<tr>
-<td width="40%" valign="middle">
-<h3>In-app browser</h3>
-Split a browser alongside your terminal with a scriptable API ported from <a href="https://github.com/vercel-labs/agent-browser">agent-browser</a>
-</td>
-<td width="60%">
-<img src="./docs/assets/built-in-browser.png" alt="Built-in browser" width="100%" />
-</td>
-</tr>
-<tr>
-<td width="40%" valign="middle">
-<h3>Vertical + horizontal tabs</h3>
-Sidebar shows git branch, linked PR status/number, working directory, listening ports, and latest notification text. Split horizontally and vertically.
-</td>
-<td width="60%">
-<img src="./docs/assets/vertical-horizontal-tabs-and-splits.png" alt="Vertical tabs and split panes" width="100%" />
-</td>
-</tr>
-<tr>
-<td width="40%" valign="middle">
-<h3>SSH</h3>
-<code>cmux ssh user@remote</code> creates a workspace for a remote machine. Browser panes route through the remote network so localhost just works. Drag an image into a remote session to upload via scp.
-</td>
-<td width="60%">
-<img src="./docs/assets/ssh.png" alt="most SSH" width="100%" />
-</td>
-</tr>
-<tr>
-<td width="40%" valign="middle">
-<h3>Claude Code Teams</h3>
-<code>cmux claude-teams</code> runs Claude Code's teammate mode with one command. Teammates spawn as native splits with sidebar metadata and notifications. No tmux required.
-</td>
-<td width="60%">
-<img src="./docs/assets/claude-code-teams.png" alt="Claude Code Teams" width="100%" />
-</td>
-</tr>
-</table>
+1. **In-app Claude status** — see which workspace is running Claude, what it's doing, and get macOS notifications when it finishes, without running an external watcher daemon.
+2. **Remote workspace sidebar pills** — when you open a workspace over SSH (`cmux ssh` / `sreda`), the sidebar should show the **remote project folder** and **git branch** just like a local session, not a blank row.
 
-- **Browser import** — Import cookies, history, and sessions from Chrome, Firefox, Arc, and 20+ browsers so browser panes start authenticated
-- **Custom commands** — Define project-specific actions in [`most.json`](https://cmux.com/docs/custom-commands) that launch from the command palette
-- **Scriptable** — CLI and socket API to create workspaces, split panes, send keystrokes, and automate the browser
-- **Native macOS app** — Built with Swift and AppKit, not Electron. Fast startup, low memory.
-- **Ghostty compatible** — Reads your existing `~/.config/ghostty/config` for themes, fonts, and colors
-- **GPU-accelerated** — Powered by libghostty for smooth rendering
+Both required enough fork-specific changes that they live here rather than as upstream PRs.
 
-## Install
+---
 
-### DMG (recommended)
+## What's new vs upstream cmux
 
-<a href="https://github.com/manaflow-ai/cmux/releases/latest/download/cmux-macos.dmg">
-  <img src="./docs/assets/macos-badge.png" alt="Download most for macOS" width="180" />
-</a>
+### In-app Claude status
+- Sidebar pills show the current Claude phase (thinking, working, idle, error) per workspace, fed by the `cmux hooks claude` event pipeline already present in cmux.
+- macOS notification on task completion routed through the in-app notification store — no external SSH watcher daemon required.
 
-Open the `.dmg` and drag most to your Applications folder. most auto-updates via Sparkle, so you only need to download once.
+### Remote workspace sidebar pills
+- **Project folder (basename)** — the remote shell's `report_pwd` command streams the working directory back over the TCP relay (`__v1` passthrough in `cmuxd-remote`); the sidebar shows only the last path component (e.g. `lingualex`, not `~/Git/lingualex`). Controlled by `sidebarPathLastSegmentOnly = true` (default on).
+- **Git branch** — `report_git_branch` likewise streams the current branch over the relay. Fixed a bug where the local git probe (which finds no repo at a remote path on macOS) was clobbering the shell-reported branch; remote workspaces now skip the local probe entirely.
 
-### Homebrew
+<!-- screenshot: sidebar pills (folder + branch) for a remote sreda session -->
+<!-- screenshot: Claude status badge in sidebar -->
+
+### SSH URL handler
+- `ssh://user@host/path` URLs open a new `cmux ssh` workspace directly, handled by `SSHStandardURLRequest`.
+
+### Rebrand
+- Bundle ID: `com.4etverg.most` (stable release), `com.4etverg.most.debug.<tag>` (dev builds).
+- App name: **most**; menubar icon and dock tile updated.
+- Settings file: `~/.config/most/most.json` (same format as cmux's `cmux.json`).
+
+<!-- screenshot: macOS notification on Claude task completion -->
+
+### Robustness fixes (this fork's contributions)
+
+| Fix | Details |
+|-----|---------|
+| **Socket classification** | All bundle-ID classification sites updated from `com.cmuxterm.app` to `com.4etverg.most` so `most` resolves its own socket instead of latching onto production cmux's. |
+| **Coexistence with cmux** | Stable socket scoped to `~/Library/Application Support/most/most.sock` — `most.app` and `cmux.app` run side-by-side without stealing each other's socket. |
+| **Compressed remote bootstrap** | The SSH shell-bundle (zsh integration + bash integration + claude wrapper, ~122 KB raw) is gzip+base64 compressed before inlining into the PTY command, keeping it well under Linux's `MAX_ARG_STRLEN` limit (128 KB). The raw payload caused `E2BIG` (`fork/exec /bin/sh: argument list too long`) after the claude-wrapper was added. |
+| **Last-segment path display** | `sidebarPathLastSegmentOnly = true` now always shows only the basename; previously `ViewThatFits` would pick the full `~/Git/project` path whenever the sidebar was wide enough. |
+
+---
+
+## Build & run
+
+### Prerequisites
 
 ```bash
-brew tap manaflow-ai/cmux
-brew install --cask cmux
+./scripts/setup.sh   # initialise submodules, build GhosttyKit, install pre-commit hook
 ```
 
-To update later:
+Requires Xcode 26.x (see `.xcode-version`).
+
+### Dev build (tagged, isolated from installed app)
 
 ```bash
-brew upgrade --cask cmux
+./scripts/reload.sh --tag my-feature
+# prints: App path: .../most DEV my-feature.app
+./scripts/reload.sh --tag my-feature --launch   # also opens it
 ```
 
-On first launch, macOS may ask you to confirm opening an app from an identified developer. Click **Open** to proceed.
+Each tag gets its own bundle ID (`com.4etverg.most.debug.my-feature`), socket (`/tmp/cmux-debug-my-feature.sock`), and DerivedData path — safe to run alongside the installed release and production cmux.
 
-## Why most?
+### Local signed Release build
 
-I run a lot of Claude Code and Codex sessions in parallel. I was using Ghostty with a bunch of split panes, and relying on native macOS notifications to know when an agent needed me. But Claude Code's notification body is always just "Claude is waiting for your input" with no context, and with enough tabs open I couldn't even read the titles anymore.
-
-I tried a few coding orchestrators but most of them were Electron/Tauri apps and the performance bugged me. I also just prefer the terminal since GUI orchestrators lock you into their workflow. So I built most as a native macOS app in Swift/AppKit. It uses libghostty for terminal rendering and reads your existing Ghostty config for themes, fonts, and colors.
-
-The main additions are the sidebar and notification system. The sidebar has vertical tabs that show git branch, linked PR status/number, working directory, listening ports, and the latest notification text for each workspace. The notification system picks up terminal sequences (OSC 9/99/777) and has a CLI (`cmux notify`) you can wire into agent hooks for Claude Code, OpenCode, etc. When an agent is waiting, its pane gets a blue ring and the tab lights up in the sidebar, so I can tell which one needs me across splits and tabs. Cmd+Shift+U jumps to the most recent unread.
-
-The in-app browser has a scriptable API ported from [agent-browser](https://github.com/vercel-labs/agent-browser). Agents can snapshot the accessibility tree, get element refs, click, fill forms, and evaluate JS. You can split a browser pane next to your terminal and have Claude Code interact with your dev server directly.
-
-Everything is scriptable through the CLI and socket API — create workspaces/tabs, split panes, send keystrokes, open URLs in the browser.
-
-## The Zen of most
-
-most is not prescriptive about how developers hold their tools. It's a terminal and browser with a CLI, and the rest is up to you.
-
-most is a primitive, not a solution. It gives you a terminal, a browser, notifications, workspaces, splits, tabs, and a CLI to control all of it. most doesn't force you into an opinionated way to use coding agents. What you build with the primitives is yours.
-
-The best developers have always built their own tools. Nobody has figured out the best way to work with agents yet, and the teams building closed products definitely haven't either. The developers closest to their own codebases will figure it out first.
-
-Give a million developers composable primitives and they'll collectively find the most efficient workflows faster than any product team could design top-down.
-
-## Documentation
-
-For more info on how to configure most, [head over to our docs](https://cmux.com/docs/getting-started?utm_source=readme).
-
-## Keyboard Shortcuts
-
-### Workspaces
-
-| Shortcut | Action |
-|----------|--------|
-| ⌘ N | New workspace |
-| ⌘ 1–8 | Jump to workspace 1–8 |
-| ⌘ 9 | Jump to last workspace |
-| ⌃ ⌘ ] | Next workspace |
-| ⌃ ⌘ [ | Previous workspace |
-| ⌘ ⇧ W | Close workspace |
-| ⌘ ⇧ R | Rename workspace |
-| ⌥ ⌘ E | Edit workspace description |
-| ⌘ B | Toggle sidebar |
-| ⌥ ⌘ B | Toggle right sidebar |
-| ⌘ ⇧ E | Toggle right sidebar focus |
-
-### Surfaces
-
-| Shortcut | Action |
-|----------|--------|
-| ⌘ T | New surface |
-| ⌘ ⇧ ] | Next surface |
-| ⌘ ⇧ [ | Previous surface |
-| ⌃ Tab | Next surface |
-| ⌃ ⇧ Tab | Previous surface |
-| ⌃ 1–8 | Jump to surface 1–8 |
-| ⌃ 9 | Jump to last surface |
-| ⌘ W | Close surface |
-
-### Split Panes
-
-| Shortcut | Action |
-|----------|--------|
-| ⌘ D | Split right |
-| ⌘ ⇧ D | Split down |
-| ⌥ ⌘ ← → ↑ ↓ | Focus pane directionally |
-| ⌘ ⇧ H | Flash focused panel |
-
-### Browser
-
-Browser developer-tool shortcuts follow Safari defaults and are customizable in `Settings → Keyboard Shortcuts`.
-Command palette navigation shortcuts, including ⌃ P, are also customizable and can be cleared so the keypress reaches the active terminal.
-
-| Shortcut | Action |
-|----------|--------|
-| ⌘ ⇧ L | Open browser in split |
-| ⌘ L | Focus address bar |
-| ⌘ [ | Back |
-| ⌘ ] | Forward |
-| ⌘ R | Reload page |
-| ⌥ ⌘ I | Toggle Developer Tools (Safari default) |
-| ⌥ ⌘ C | Show JavaScript Console (Safari default) |
-
-### Notifications
-
-| Shortcut | Action |
-|----------|--------|
-| ⌘ I | Show notifications panel |
-| ⌘ ⇧ U | Jump to latest unread |
-| ⌥ ⌘ U | Toggle current item unread state |
-| ⌃ ⌘ U | Mark current item as oldest unread and jump to next latest unread |
-
-### Find
-
-| Shortcut | Action |
-|----------|--------|
-| ⌘ F | Find |
-| ⌘ ⇧ F | Find in directory |
-| ⌘ G / ⌥ ⌘ G | Find next / previous |
-| ⌥ ⌘ ⇧ F | Hide find bar |
-| ⌘ E | Use selection for find |
-
-### Terminal
-
-| Shortcut | Action |
-|----------|--------|
-| ⌘ K | Clear scrollback |
-| ⌘ C | Copy (with selection) |
-| ⌘ V | Paste |
-| ⌘ + / ⌘ - | Increase / decrease font size |
-| ⌘ 0 | Reset font size |
-
-### Window
-
-| Shortcut | Action |
-|----------|--------|
-| ⌘ ⇧ N | New window |
-| ⌘ ⇧ O | Reopen previous session |
-| ⌘ , | Settings |
-| ⌘ ⇧ , | Reload configuration |
-| ⌘ Q | Quit |
-
-## Nightly Builds
-
-[Download most NIGHTLY](https://github.com/manaflow-ai/cmux/releases/download/nightly/cmux-nightly-macos.dmg)
-
-most NIGHTLY is a separate app with its own bundle ID, so it runs alongside the stable version. Built automatically from the latest `main` commit and auto-updates via its own Sparkle feed.
-
-Report nightly bugs on [GitHub Issues](https://github.com/manaflow-ai/cmux/issues) or in [#nightly-bugs on Discord](https://discord.gg/xsgFEVrWCZ).
-
-## Session restore
-
-Quitting most saves the current session. On relaunch, most restores app-owned
-state:
-- Window/workspace/pane layout
-- Working directories
-- Terminal scrollback (best effort)
-- Browser URL and navigation history
-
-most does not checkpoint arbitrary live process state. tmux, vim, shells, and
-unsupported terminal apps reopen as normal terminals.
-
-Supported agent sessions can resume when hooks have saved a native session ID.
-Install hooks after installing the agent CLI so its binary is on `PATH`:
+There is no notarized public release yet. To install a signed local copy:
 
 ```bash
-cmux hooks setup
-cmux hooks setup codex
-cmux hooks setup --agent opencode
+xcodebuild \
+  -project cmux.xcodeproj -scheme cmux -configuration Release \
+  -destination 'platform=macOS' \
+  DEVELOPMENT_TEAM=<your-apple-team-id> \
+  CODE_SIGN_STYLE=Automatic \
+  CODE_SIGN_IDENTITY="Apple Development" \
+  CODE_SIGN_ENTITLEMENTS="" \
+  -allowProvisioningUpdates \
+  -derivedDataPath /tmp/most-release-build \
+  build
+
+cp -R /tmp/most-release-build/Build/Products/Release/most.app /Applications/most.app
 ```
 
-`cmux hooks setup` installs supported agents it can find and prints a summary
-for skipped agents. Supported resume integrations include Claude Code, Codex,
-Grok, OpenCode, Pi, Amp, Cursor CLI, Gemini, Rovo Dev, Copilot, CodeBuddy,
-Factory, and Qoder. Claude Code is handled by the most Claude wrapper when Claude
-integration is enabled in Settings.
+> `CODE_SIGN_ENTITLEMENTS=""` bypasses the `keychain-access-groups` entitlement that requires a provisioning profile scoped to the original team. Fine for local use; a proper notarized build needs the full entitlements and a Developer ID cert.
 
-Advanced users and integrations can attach a custom resume command to the
-current terminal surface. This is useful for tools with their own durable state,
-such as tmux sessions or custom agent CLIs:
+First launch may require **right-click → Open** once (Gatekeeper: Apple Development cert, not notarized).
 
-```bash
-cmux surface resume set --kind tmux --checkpoint work --shell "tmux attach -t work"
-cmux surface resume show --json
-cmux surface resume clear --checkpoint work
-```
+---
 
-The binding stays attached to the most surface. Public CLI or socket-created
-bindings are stored for inspection and manual restore unless you approve a
-signed command prefix for automatic restore. Approved prefixes are also bound to
-the working directory and exact environment values, when present. Review or edit
-approvals in **Settings > Terminal > Resume Commands**. most only auto-runs
-resume bindings it marks trusted, such as live process-detected tmux bindings or
-user-approved prefixes. Sensitive environment keys such as tokens, passwords,
-secrets, and API keys are dropped before a resume binding is stored.
+## Relationship to upstream / license
 
-To keep restored agent terminals idle instead of automatically running their resume commands,
-turn off **Settings > Terminal > Resume Agent Sessions on Reopen** or set this in
-`~/.config/most/most.json`:
+- Tracks [manaflow-ai/cmux](https://github.com/manaflow-ai/cmux) (`upstream` remote). Fork-specific work stays on `main`; upstream merges via `git merge upstream/main`.
+- Submodule `ghostty` tracks [manaflow-ai/ghostty](https://github.com/manaflow-ai/ghostty), itself a fork of the upstream Ghostty renderer.
+- **The upstream LICENSE is preserved unchanged.** See `LICENSE` in this repository.
 
-```json
-{
-  "terminal": {
-    "autoResumeAgentSessions": false
-  }
-}
-```
+---
 
-This only disables automatic agent resume commands. most still restores the saved layout,
-working directories, scrollback, and browser history.
+## Roadmap
 
-If you need to reapply the last saved snapshot manually, use:
-- `File > Reopen Previous Session`
-- `⌘ ⇧ O`
-- `cmux restore-session`
+Planned, not yet done:
 
-Under the hood, most writes a versioned snapshot under
-`~/Library/Application Support/most/` and agent hooks write session mappings
-under `~/.cmuxterm/`. On restore, most rebuilds the layout first, then runs the
-supported agent's native resume command when automatic agent resume is enabled.
-
-Read the full guide at <https://cmux.com/docs/session-restore>.
-
-## Star History
-
-<a href="https://star-history.com/#manaflow-ai/cmux&Date">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=manaflow-ai/cmux&type=Date&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=manaflow-ai/cmux&type=Date" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=manaflow-ai/cmux&type=Date" width="600" />
- </picture>
-</a>
-
-## Contributing
-
-Ways to get involved:
-
-- Follow us on X for updates [@manaflowai](https://x.com/manaflowai), [@lawrencecchen](https://x.com/lawrencecchen), and [@austinywang](https://x.com/austinywang)
-- Join the conversation on [Discord](https://discord.gg/xsgFEVrWCZ)
-- Create and participate in [GitHub issues](https://github.com/manaflow-ai/cmux/issues) and [discussions](https://github.com/manaflow-ai/cmux/discussions)
-- Let us know what you're building with most
-
-## Community
-
-- [Discord](https://discord.gg/xsgFEVrWCZ)
-- [GitHub](https://github.com/manaflow-ai/cmux)
-- [X / Twitter](https://twitter.com/manaflowai)
-- [YouTube](https://www.youtube.com/channel/UCAa89_j-TWkrXfk9A3CbASw)
-- [LinkedIn](https://www.linkedin.com/company/manaflow-ai/)
-- [Reddit](https://www.reddit.com/r/cmux/)
-
-## Founder's Edition
-
-cmux is free, open source, and always will be. If you'd like to support development and get early access to what's coming next:
-
-**[Get Founder's Edition](https://buy.stripe.com/3cI00j2Ld0it5OU33r5EY0q)**
-
-- **Prioritized feature requests/bug fixes**
-- **Early access: most AI that gives you context on every workspace, tab and panel**
-- **Early access: iOS app with terminals synced between desktop and phone**
-- **Early access: Cloud VMs**
-- **Early access: Voice mode**
-- **My personal iMessage/WhatsApp**
-
-## License
-
-most is open source under [GPL-3.0-or-later](LICENSE).
-
-If your organization cannot comply with GPL, a commercial license is available. Contact [founders@manaflow.com](mailto:founders@manaflow.com) for details.
+- **Phase D** — Cherry-pick selected upstream cmux improvements (session persistence, browser panel refinements).
+- **Phase E** — `sreda2` / `shpool` replacement for more robust remote session management.
+- **Friday cockpit** — SSE status feed + `most://` deep-link protocol for dashboard integration.
+- **In-app rename/reconnect** — rename remote workspaces and reconnect dropped SSH sessions without leaving the app.
+- **Notarized public release** — Developer ID signing + notarization so first launch doesn't require right-click → Open.
