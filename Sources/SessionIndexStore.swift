@@ -416,8 +416,13 @@ final class SessionIndexStore: ObservableObject {
     /// is known. Each category groups the entries whose cwd relationship to `currentDirectory`
     /// matches the category's rule:
     ///
-    /// - `.main`: cwd is `currentDirectory` or a subdirectory NOT under `.worktrees/`.
-    /// - `.worktrees`: cwd is under `currentDirectory/.worktrees/` (or any `.worktrees/` dir inside).
+    /// - `.main`: cwd is `currentDirectory` or a subdirectory NOT under any `.worktrees/`
+    ///   path component within the tree.
+    /// - `.worktrees`: cwd is anywhere inside the `currentDirectory` subtree AND contains
+    ///   a `/.worktrees/` path component (e.g. `<dir>/.worktrees/<wt>` directly, or
+    ///   `<parent>/<repo>/.worktrees/<wt>` when `currentDirectory` is a parent of multiple
+    ///   repos). Also matches a cwd that IS exactly `<something>/.worktrees` (no trailing
+    ///   component).
     /// - `.other`: cwd belongs to a completely different directory tree.
     ///
     /// When `currentDirectory` is nil the function returns a single `.main` category
@@ -436,8 +441,17 @@ final class SessionIndexStore: ObservableObject {
             guard let cwd = normalizedDirectory(entry.cwd) else { return .other }
             // Exact match to the current directory itself counts as Main.
             if cwd == dir { return .main }
+            // Direct .worktrees child of dir (original top-level case).
             if cwd.hasPrefix(worktreesPrefix) || cwd == (dir + "/.worktrees") { return .worktrees }
-            if cwd.hasPrefix(dirPrefix) { return .main }
+            if cwd.hasPrefix(dirPrefix) {
+                // Any path inside the subtree that contains a /.worktrees/ component
+                // (e.g. <parent>/<repo>/.worktrees/<wt>) is classified as Worktrees.
+                // The slash delimiters prevent false matches on names like "foo.worktreesbar".
+                if cwd.range(of: "/.worktrees/") != nil || cwd.hasSuffix("/.worktrees") {
+                    return .worktrees
+                }
+                return .main
+            }
             return .other
         }
 

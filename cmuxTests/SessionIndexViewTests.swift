@@ -182,6 +182,101 @@ final class SessionIndexViewTests: XCTestCase {
         }
     }
 
+    // MARK: - categorizedSectionsForCurrentGrouping — worktree scoping
+
+    /// Regression: when currentDirectory is a PARENT of multiple repos,
+    /// sessions whose cwd is inside `<parent>/<repo>/.worktrees/<wt>` were
+    /// incorrectly classified as `.main` because the old check only looked for
+    /// `.worktrees/` directly under `currentDirectory`. The fix searches for
+    /// `/.worktrees/` as a path component anywhere within the subtree.
+    func testWorktreeSessionUnderParentDirectoryIsClassifiedAsWorktrees() {
+        preservingSessionIndexDefaults {
+            let store = SessionIndexStore()
+            // currentDirectory is the parent containing multiple repos.
+            store.currentDirectory = "/Users/vangor/Git"
+
+            let mainEntry = makeEntry(
+                title: "cmux main",
+                cwd: "/Users/vangor/Git/cmux"
+            )
+            let worktreeEntry = makeEntry(
+                title: "cmux worktree",
+                cwd: "/Users/vangor/Git/cmux/.worktrees/feature-branch"
+            )
+            let otherEntry = makeEntry(
+                title: "unrelated",
+                cwd: "/Users/other/project"
+            )
+
+            store.replaceEntriesForTesting([mainEntry, worktreeEntry, otherEntry])
+
+            let categorized = store.categorizedSectionsForCurrentGrouping()
+            let categories = categorized.map(\.category)
+
+            XCTAssertTrue(
+                categories.contains(.worktrees),
+                "Expected a .worktrees category when a session cwd contains /.worktrees/ under a parent dir. Got: \(categories)"
+            )
+            XCTAssertTrue(
+                categories.contains(.main),
+                "Expected a .main category for direct repo sessions. Got: \(categories)"
+            )
+            XCTAssertTrue(
+                categories.contains(.other),
+                "Expected an .other category for out-of-tree sessions. Got: \(categories)"
+            )
+            // Three distinct categories → showCategoryHeaders would be true.
+            XCTAssertEqual(
+                categorized.count, 3,
+                "Expected exactly 3 categories (main / worktrees / other). Got: \(categories)"
+            )
+
+            // Verify the worktree entry ended up in the right bucket.
+            let worktreesCategory = categorized.first(where: { $0.category == .worktrees })
+            let worktreeEntryTitles = worktreesCategory?.sections.flatMap(\.entries).map(\.title) ?? []
+            XCTAssertTrue(
+                worktreeEntryTitles.contains("cmux worktree"),
+                "The worktree session should be in the .worktrees bucket. Got: \(worktreeEntryTitles)"
+            )
+
+            // Verify the main repo session ended up in the main bucket (not misclassified).
+            let mainCategory = categorized.first(where: { $0.category == .main })
+            let mainEntryTitles = mainCategory?.sections.flatMap(\.entries).map(\.title) ?? []
+            XCTAssertTrue(
+                mainEntryTitles.contains("cmux main"),
+                "The direct-repo session should be in the .main bucket. Got: \(mainEntryTitles)"
+            )
+        }
+    }
+
+    /// Edge case: cwd exactly equal to currentDirectory should still be .main.
+    func testCwdExactlyEqualToCurrentDirectoryIsMain() {
+        preservingSessionIndexDefaults {
+            let store = SessionIndexStore()
+            store.currentDirectory = "/Users/vangor/Git/cmux"
+            let entry = makeEntry(title: "exact match", cwd: "/Users/vangor/Git/cmux")
+            store.replaceEntriesForTesting([entry])
+            let categorized = store.categorizedSectionsForCurrentGrouping()
+            XCTAssertEqual(categorized.count, 1)
+            XCTAssertEqual(categorized.first?.category, .main)
+        }
+    }
+
+    /// Edge case: a directory literally containing "worktreesbar" in its name should
+    /// NOT be classified as .worktrees — the slash-delimited check avoids false matches.
+    func testDirectoryNameContainingWorktreesSubstringIsNotMisclassified() {
+        preservingSessionIndexDefaults {
+            let store = SessionIndexStore()
+            store.currentDirectory = "/Users/vangor/Git"
+            // Name contains "worktrees" but not as a /.worktrees/ path component.
+            let entry = makeEntry(title: "tricky name", cwd: "/Users/vangor/Git/myproject.worktreesbar/subdir")
+            store.replaceEntriesForTesting([entry])
+            let categorized = store.categorizedSectionsForCurrentGrouping()
+            XCTAssertEqual(categorized.count, 1)
+            XCTAssertEqual(categorized.first?.category, .main, "Path with 'worktrees' in filename should not become .worktrees")
+        }
+    }
+
     func testAgentOrderBackfillUsesLatestModifiedForDuplicateAgents() {
         preservingSessionIndexDefaults {
             let store = SessionIndexStore()
