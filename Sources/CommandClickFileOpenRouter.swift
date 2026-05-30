@@ -87,4 +87,41 @@ enum CommandClickFileOpenRouter {
             fallback?()
         }
     }
+
+    /// Like `deferredOpenFileInCmux` but bypasses the `isRemoteTerminalSurface`
+    /// guard. Use only when `filePath` has already been rewritten from a server-side
+    /// path to a locally-accessible path (e.g. via `SredaServerPathRewriter`).
+    ///
+    /// Preserves the same `DispatchQueue.main.async` deferral and TOCTOU re-validation
+    /// as the standard variant to avoid deadlocking Ghostty's `os_unfair_lock` (#3370).
+    @MainActor
+    static func deferredOpenLocalFileBypassingRemoteGate(
+        workspace: Workspace,
+        preferredWorkspaceId: UUID,
+        surfaceId: UUID,
+        filePath: String,
+        fallback: (@MainActor @Sendable () -> Void)? = nil
+    ) {
+        DispatchQueue.main.async {
+            let resolvedWorkspace = AppDelegate.shared?.workspaceContainingPanel(
+                panelId: surfaceId,
+                preferredWorkspaceId: preferredWorkspaceId
+            )?.workspace ?? workspace
+            // Remote-gate intentionally skipped: filePath is a rewritten LOCAL path
+            // (e.g. NFS-mounted sreda path). The surface is still remote — we just
+            // know the file content is accessible locally.
+            guard shouldRouteInCmux(path: filePath) else {
+                fallback?()
+                return
+            }
+            if openInCmux(
+                workspace: resolvedWorkspace,
+                sourcePanelId: surfaceId,
+                filePath: filePath
+            ) {
+                return
+            }
+            fallback?()
+        }
+    }
 }
