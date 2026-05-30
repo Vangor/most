@@ -115795,6 +115795,40 @@
         }
       }
     },
+    "settings.app.openSredaRemotePathsInCmux": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Sreda Paths in most"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "sreda パスを most で開く"
+          }
+        }
+      }
+    },
+    "settings.app.openSredaRemotePathsInCmux.subtitle": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cmd-clicking an absolute sreda server path (/srv/nvme/git or /srv/nvme/vault) on a remote terminal rewrites it to the locally-mounted NFS path and opens it in most."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "リモートターミナルで sreda サーバーパス（/srv/nvme/git または /srv/nvme/vault）を Cmd+クリックすると、ローカルにマウントされた NFS パスに変換して most で開きます。"
+          }
+        }
+      }
+    },
     "rightSidebar.close.accessibilityLabel": {
       "extractionState": "manual",
       "localizations": {

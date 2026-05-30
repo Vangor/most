@@ -4662,6 +4662,66 @@ class GhosttyApp {
             cmuxDebugLog("link.openURL raw=\(urlString)")
             #endif
 
+            // --- Sreda remote path rewriting ---
+            // When the surface is a remote terminal (SSH session into sreda) and
+            // the raw string is an absolute sreda server path
+            // (/srv/nvme/git/… or /srv/nvme/vault/…), rewrite it to the
+            // locally-mounted NFS path and open it in most directly.
+            // This replaces an external clipboard-watcher hack.
+            //
+            // The remote-surface gate inside deferredOpenFileInCmux is intentionally
+            // bypassed via deferredOpenLocalFileBypassingRemoteGate because the file
+            // path is now LOCAL (NFS-mounted). The os_unfair_lock deferral (#3370)
+            // is preserved in both variants.
+            let trimmedUrlString = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmedUrlString.isEmpty,
+               CmdClickSredaRemotePathSettings.isEnabled(),
+               SredaServerPathRewriter.isSredaPath(trimmedUrlString) {
+                let sredaRouted: Bool = performOnMain {
+                    guard let termSurface = surfaceView.terminalSurface,
+                          let workspace = termSurface.owningWorkspace(),
+                          workspace.isRemoteTerminalSurface(termSurface.id) else {
+                        // Non-remote surface: fall through to local handling below.
+                        return false
+                    }
+                    guard let result = SredaServerPathRewriter.localPath(forServerPath: trimmedUrlString) else {
+                        #if DEBUG
+                        cmuxDebugLog("link.openURL sreda path not found locally: \(trimmedUrlString)")
+                        #endif
+                        return false
+                    }
+                    let localPath = result.path
+                    let localURL = URL(fileURLWithPath: localPath)
+                    #if DEBUG
+                    cmuxDebugLog("link.openURL sreda rewrite: \(trimmedUrlString) → \(localPath)")
+                    #endif
+                    var isDir: ObjCBool = false
+                    FileManager.default.fileExists(atPath: localPath, isDirectory: &isDir)
+                    if isDir.boolValue {
+                        // Directories: open in Finder (most only routes files).
+                        NSWorkspace.shared.open(localURL)
+                        return true
+                    }
+                    if CommandClickFileOpenRouter.shouldRouteInCmux(path: localPath) {
+                        CommandClickFileOpenRouter.deferredOpenLocalFileBypassingRemoteGate(
+                            workspace: workspace,
+                            preferredWorkspaceId: workspace.id,
+                            surfaceId: termSurface.id,
+                            filePath: localPath
+                        ) {
+                            NSWorkspace.shared.open(localURL)
+                        }
+                    } else {
+                        // File type not routable by most (e.g. binary): open externally.
+                        NSWorkspace.shared.open(localURL)
+                    }
+                    return true
+                }
+                if sredaRouted {
+                    return true
+                }
+            }
+
             // Try file-path resolution before URL classification.
             // Ghostty's link detection can match relative file paths that
             // contain slashes or dots (e.g. "docs/spec.md.") as URLs.
@@ -4669,7 +4729,6 @@ class GhosttyApp {
             // (with trailing-punctuation trimming via cmuxResolveQuicklookPath).
             // If the file exists and cmux can handle it, route through the
             // file viewer instead of the browser.
-            let trimmedUrlString = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
             if !trimmedUrlString.isEmpty,
                !NSString(string: trimmedUrlString).isAbsolutePath,
                URL(string: trimmedUrlString)?.scheme == nil {

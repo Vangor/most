@@ -5003,6 +5003,27 @@ enum CmdClickSupportedFileRouteSettings {
     }
 }
 
+/// Controls whether cmd-clicking an absolute sreda server path on a remote terminal
+/// surface rewrites it to the locally-mounted NFS path and opens it in most.
+///
+/// Defaults to `true` (enabled). Users who don't have sreda NFS mounted can turn this
+/// off to stop the existence check and fall through to the existing remote behavior.
+enum CmdClickSredaRemotePathSettings {
+    static let key = "openSredaRemotePathsInCmux"
+    static let defaultValue = true
+
+    static func isEnabled(defaults: UserDefaults = .standard) -> Bool {
+        defaults.object(forKey: key) == nil ? defaultValue : defaults.bool(forKey: key)
+    }
+
+    static func setEnabled(
+        _ enabled: Bool,
+        defaults: UserDefaults = .standard
+    ) {
+        defaults.set(enabled, forKey: key)
+    }
+}
+
 enum PreferredEditorSettings {
     static let key = "preferredEditorCommand"
 
@@ -5241,6 +5262,8 @@ struct SettingsView: View {
     @AppStorage(CmdClickSupportedFileRouteSettings.key)
     private var openSupportedFilesInCmux = CmdClickSupportedFileRouteSettings.defaultValue
     @AppStorage(CmdClickMarkdownRouteSettings.key) private var openMarkdownInCmuxViewer = CmdClickMarkdownRouteSettings.defaultValue
+    @AppStorage(CmdClickSredaRemotePathSettings.key)
+    private var openSredaRemotePathsInCmux = CmdClickSredaRemotePathSettings.defaultValue
     @AppStorage(AutomationSettings.portBaseKey) private var cmuxPortBase = AutomationSettings.defaultPortBase
     @AppStorage(AutomationSettings.portRangeKey) private var cmuxPortRange = AutomationSettings.defaultPortRange
     @AppStorage(BrowserSearchSettings.searchEngineKey) private var browserSearchEngine = BrowserSearchSettings.defaultSearchEngine.rawValue
@@ -6416,6 +6439,21 @@ struct SettingsView: View {
                                 .controlSize(.small)
                                 .accessibilityLabel(
                                     String(localized: "settings.app.openMarkdownInCmuxViewer", defaultValue: "Open Markdown in cmux Viewer")
+                                )
+                        }
+
+                        SettingsCardDivider()
+
+                        SettingsCardRow(
+                            configurationReview: .json("app.openSredaRemotePathsInCmux"),
+                            String(localized: "settings.app.openSredaRemotePathsInCmux", defaultValue: "Open Sreda Paths in most"),
+                            subtitle: String(localized: "settings.app.openSredaRemotePathsInCmux.subtitle", defaultValue: "Cmd-clicking an absolute sreda server path (/srv/nvme/git or /srv/nvme/vault) on a remote terminal rewrites it to the locally-mounted NFS path and opens it in most.")
+                        ) {
+                            Toggle("", isOn: $openSredaRemotePathsInCmux)
+                                .labelsHidden()
+                                .controlSize(.small)
+                                .accessibilityLabel(
+                                    String(localized: "settings.app.openSredaRemotePathsInCmux", defaultValue: "Open Sreda Paths in most")
                                 )
                         }
 
@@ -8120,6 +8158,8 @@ struct SettingsView: View {
         CmdClickSupportedFileRouteSettings.setEnabled(CmdClickSupportedFileRouteSettings.defaultValue)
         openSupportedFilesInCmux = CmdClickSupportedFileRouteSettings.defaultValue
         openMarkdownInCmuxViewer = CmdClickMarkdownRouteSettings.defaultValue
+        CmdClickSredaRemotePathSettings.setEnabled(CmdClickSredaRemotePathSettings.defaultValue)
+        openSredaRemotePathsInCmux = CmdClickSredaRemotePathSettings.defaultValue
         browserSearchEngine = BrowserSearchSettings.defaultSearchEngine.rawValue
         browserCustomSearchEngineName = BrowserSearchSettings.defaultCustomSearchEngineName
         browserCustomSearchEngineURLTemplate = BrowserSearchSettings.defaultCustomSearchEngineURLTemplate
