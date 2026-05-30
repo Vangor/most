@@ -174,6 +174,14 @@ struct RightSidebarPanelView: View {
     private let focusShortcutHintYOffset = ShortcutHintDebugSettings.defaultRightSidebarFocusHintY
     @AppStorage(RightSidebarBetaFeatureSettings.dockEnabledKey)
     private var dockEnabled = RightSidebarBetaFeatureSettings.defaultDockEnabled
+    /// Scale multiplier derived from the `sidebar-font-size` Ghostty config key
+    /// (the same key that drives the left sidebar). Default 1.0 = no change.
+    @State private var fontScale: CGFloat = 1.0
+    /// Incremented when `.ghosttyConfigDidReload` fires so the `.task(id:)`
+    /// below re-runs to pick up the new sidebar-font-size value.
+    @State private var fontScaleRefreshToken: Int = 0
+
+    private func rsScaled(_ base: CGFloat) -> CGFloat { base * fontScale }
 
     // Re-reading the observable store inside modeBar causes SwiftUI to
     // track the pending count so the badge updates live when hooks push
@@ -224,6 +232,19 @@ struct RightSidebarPanelView: View {
         }
         .onChange(of: fileExplorerState.isVisible) { _, visible in if !visible { dockStore.deactivate() } }
         .onChange(of: dockEnabled) { _, _ in refreshModeAvailabilityAndFocusIfNeeded() }
+        // Reload the scale whenever the Ghostty config is reloaded.
+        .onReceive(
+            NotificationCenter.default.publisher(for: .ghosttyConfigDidReload)
+        ) { _ in
+            fontScaleRefreshToken &+= 1
+        }
+        // Load font scale off the main actor. Reruns when fontScaleRefreshToken
+        // changes (i.e. on config reload) and on initial appear.
+        .task(id: fontScaleRefreshToken) {
+            let size = await SidebarFontSizeProvider.loadFromGhosttyConfig()
+            guard !Task.isCancelled else { return }
+            fontScale = SidebarTabItemFontScale.scale(for: size)
+        }
     }
 
     private var modeBar: some View {
@@ -243,7 +264,8 @@ struct RightSidebarPanelView: View {
                             shortcut: shortcut,
                             alwaysShowShortcutHints: alwaysShowShortcutHints,
                             modifierPressed: modeShortcutHintMonitor.isModifierPressed
-                        )
+                        ),
+                        fontScale: fontScale
                     ) {
                         if AppDelegate.shared?.focusRightSidebarInActiveMainWindow(
                             mode: mode,
@@ -337,7 +359,7 @@ struct RightSidebarPanelView: View {
         .background(MinimalModeTitlebarControlHitRegionView())
         .overlay(alignment: .top) {
             if showsShortcutHint {
-                ShortcutHintPill(shortcut: shortcut, fontSize: 9, emphasis: 1.05)
+                ShortcutHintPill(shortcut: shortcut, fontSize: rsScaled(9), emphasis: 1.05)
                     .fixedSize(horizontal: true, vertical: false)
                     .offset(
                         x: CGFloat(ShortcutHintDebugSettings.clamped(closeShortcutHintXOffset)),
@@ -365,7 +387,7 @@ struct RightSidebarPanelView: View {
         if showsFocusShortcutHint {
             ShortcutHintPill(
                 shortcut: shortcut,
-                fontSize: 9,
+                fontSize: rsScaled(9),
                 emphasis: 1.05
             )
                 .padding(.leading, 6)
@@ -537,9 +559,12 @@ private struct ModeBarButton: View {
     var badgeCount: Int = 0
     let shortcutHint: StoredShortcut
     let showsShortcutHint: Bool
+    var fontScale: CGFloat = 1.0
     let action: () -> Void
 
     @State private var isHovered: Bool = false
+
+    private func rsScaled(_ base: CGFloat) -> CGFloat { base * fontScale }
 
     var body: some View {
         Button(action: action) {
@@ -548,7 +573,7 @@ private struct ModeBarButton: View {
                     .symbolRenderingMode(.monochrome)
                     .font(
                         .system(
-                            size: RightSidebarChromeControlStyle.modeIconSize,
+                            size: rsScaled(RightSidebarChromeControlStyle.modeIconSize),
                             weight: RightSidebarChromeControlStyle.iconWeight
                         )
                     )
@@ -559,7 +584,7 @@ private struct ModeBarButton: View {
                 Text(mode.label)
                     .font(
                         .system(
-                            size: RightSidebarChromeControlStyle.labelSize,
+                            size: rsScaled(RightSidebarChromeControlStyle.labelSize),
                             weight: RightSidebarChromeControlStyle.labelWeight
                         )
                     )
@@ -576,7 +601,7 @@ private struct ModeBarButton: View {
             )
             .overlay(alignment: .trailing) {
                 if showsShortcutHint {
-                    ShortcutHintPill(shortcut: shortcutHint, fontSize: 9, emphasis: isSelected ? 1.15 : 0.95)
+                    ShortcutHintPill(shortcut: shortcutHint, fontSize: rsScaled(9), emphasis: isSelected ? 1.15 : 0.95)
                         .offset(x: 5)
                         .shortcutHintTransition()
                         .accessibilityIdentifier("rightSidebarModeShortcutHint.\(mode.rawValue)")
@@ -609,7 +634,7 @@ private struct ModeBarButton: View {
     private var pendingChip: some View {
         let countText = badgeCount > 9 ? "9+" : String(badgeCount)
         return Text(countText)
-            .font(.system(size: 10, weight: .bold).monospacedDigit())
+            .font(.system(size: rsScaled(10), weight: .bold).monospacedDigit())
             .lineLimit(1)
             .fixedSize(horizontal: true, vertical: true)
             .foregroundColor(.orange)

@@ -115,6 +115,50 @@ final class SidebarActiveTabIndicatorSettingsTests: XCTestCase {
     }
 }
 
+final class SidebarTabItemFontScaleTests: XCTestCase {
+    func testDefaultSidebarFontScaleIsUnitScale() throws {
+        let scale = SidebarTabItemFontScale.scale(for: GhosttyConfig.defaultSidebarFontSize)
+
+        XCTAssertEqual(scale, 1, accuracy: 0.0001)
+    }
+
+    func testSidebarFontScaleIsProportionalToDefaultSidebarSize() throws {
+        let scale = SidebarTabItemFontScale.scale(for: 18)
+
+        XCTAssertEqual(
+            scale,
+            18 / GhosttyConfig.defaultSidebarFontSize,
+            accuracy: 0.0001
+        )
+    }
+
+    func testSidebarFontScaleClampsSmallSizes() throws {
+        let scale = SidebarTabItemFontScale.scale(for: 4)
+
+        XCTAssertEqual(
+            scale,
+            GhosttyConfig.minSidebarFontSize / GhosttyConfig.defaultSidebarFontSize,
+            accuracy: 0.0001
+        )
+    }
+
+    func testSidebarFontScaleClampsLargeSizes() throws {
+        let scale = SidebarTabItemFontScale.scale(for: 48)
+
+        XCTAssertEqual(
+            scale,
+            GhosttyConfig.maxSidebarFontSize / GhosttyConfig.defaultSidebarFontSize,
+            accuracy: 0.0001
+        )
+    }
+
+    func testSidebarFontScaleFallsBackToDefaultForNonFiniteValue() throws {
+        let scale = SidebarTabItemFontScale.scale(for: CGFloat.nan)
+
+        XCTAssertEqual(scale, 1, accuracy: 0.0001)
+    }
+}
+
 
 final class SidebarRemoteErrorCopySupportTests: XCTestCase {
     func testMenuLabelIsNilWhenThereAreNoErrors() {
