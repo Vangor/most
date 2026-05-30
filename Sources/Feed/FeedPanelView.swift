@@ -223,6 +223,32 @@ private struct FeedClearButton: View {
     }
 }
 
+/// Small ✕ button overlaid on a feed row when hovered. Removes that
+/// single item unconditionally (including pending) via the `dismiss`
+/// closure, which routes to `FeedCoordinator.dismissItem(id:)`.
+private struct FeedRowDismissButton: View {
+    var fontScale: CGFloat = 1.0
+    let action: () -> Void
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "xmark")
+                .font(.system(size: fontScale * 9, weight: .semibold))
+                .foregroundColor(.secondary.opacity(isHovered ? 0.9 : 0.55))
+                .padding(4)
+                .background(
+                    Circle()
+                        .fill(Color.primary.opacity(isHovered ? 0.12 : 0.06))
+                )
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
+        .help(String(localized: "feed.row.dismiss.tooltip", defaultValue: "Dismiss this item"))
+        .accessibilityLabel(String(localized: "feed.row.dismiss.accessibility", defaultValue: "Dismiss"))
+    }
+}
+
 /// Feed content surface. Isolated so the outer panel's `@State`
 /// changes don't invalidate rows unnecessarily. Receives items as a
 /// plain value so its body never touches the live store, the parent
@@ -727,6 +753,23 @@ private struct FeedRowSurface: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(rowBackgroundFill)
+        .overlay(alignment: .topTrailing) {
+            if isHovered {
+                FeedRowDismissButton(fontScale: fontScale) {
+                    actions.dismiss(snapshot.id)
+                }
+                .padding(.top, 6)
+                .padding(.trailing, 8)
+                .transition(.opacity.animation(.easeOut(duration: 0.1)))
+            }
+        }
+        .contextMenu {
+            Button {
+                actions.dismiss(snapshot.id)
+            } label: {
+                Text(String(localized: "feed.row.dismiss.menu", defaultValue: "Dismiss"))
+            }
+        }
         .animation(.easeOut(duration: 0.14), value: isHovered)
         .animation(.easeOut(duration: 0.14), value: isSelected)
         .onHover { hovering in
@@ -1008,6 +1051,11 @@ struct FeedRowActions {
     /// Single shared action path — every clear surface (button, future
     /// keyboard shortcut, context menu) calls this one closure.
     let clearInactionable: () -> Void
+    /// Removes a single feed item unconditionally regardless of status
+    /// (including `.pending`). Per-row dismiss — routes to
+    /// `FeedCoordinator.dismissItem(id:)` which delegates to the store's
+    /// single authoritative `dismiss(id:)` mutation.
+    let dismiss: (UUID) -> Void
 
     static func bound() -> FeedRowActions {
         FeedRowActions(
@@ -1051,6 +1099,11 @@ struct FeedRowActions {
             clearInactionable: {
                 Task { @MainActor in
                     FeedCoordinator.shared.clearInactionableItems()
+                }
+            },
+            dismiss: { itemId in
+                Task { @MainActor in
+                    FeedCoordinator.shared.dismissItem(id: itemId)
                 }
             }
         )
