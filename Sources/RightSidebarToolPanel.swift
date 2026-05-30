@@ -288,7 +288,8 @@ struct RightSidebarToolPanelView: View {
                 },
                 onRename: { entry in
                     panel.renameSessionEntry(entry, tabManager: tabManager, sessionIndexStore: panel.sessionIndexStore)
-                }
+                },
+                workspaceCwd: tabManager.selectedWorkspace?.currentDirectory
             )
             .background(
                 RightSidebarToolFocusAnchor(onViewChange: panel.attachSessionIndexFocusAnchor)
