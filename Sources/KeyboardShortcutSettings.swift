@@ -85,6 +85,8 @@ enum KeyboardShortcutSettings {
         case toggleUnread
         case markOldestUnreadAndJumpNext
         case focusRightSidebar
+        case openFeed
+        case openVault
         case switchRightSidebarToFiles
         case switchRightSidebarToFind
         case switchRightSidebarToSessions
@@ -178,6 +180,8 @@ enum KeyboardShortcutSettings {
             case .markOldestUnreadAndJumpNext:
                 return String(localized: "shortcut.markOldestUnreadAndJumpNext.label", defaultValue: "Mark as Oldest Unread and Jump to Next Latest Unread")
             case .focusRightSidebar: return String(localized: "shortcut.focusRightSidebar.label", defaultValue: "Toggle Right Sidebar Focus")
+            case .openFeed: return String(localized: "shortcut.openFeed.label", defaultValue: "Open Feed")
+            case .openVault: return String(localized: "shortcut.openVault.label", defaultValue: "Open Vault")
             case .switchRightSidebarToFiles: return String(localized: "shortcut.switchRightSidebarToFiles.label", defaultValue: "Show Sidebar Files")
             case .switchRightSidebarToFind: return String(localized: "shortcut.switchRightSidebarToFind.label", defaultValue: "Show Sidebar Find")
             case .switchRightSidebarToSessions: return String(localized: "shortcut.switchRightSidebarToSessions.label", defaultValue: "Show Sidebar Vault")
@@ -301,6 +305,10 @@ enum KeyboardShortcutSettings {
             case .markOldestUnreadAndJumpNext:
                 return StoredShortcut(key: "u", command: true, shift: false, option: false, control: true)
             case .focusRightSidebar:
+                return .unbound
+            case .openFeed:
+                return StoredShortcut(key: "e", command: true, shift: false, option: false, control: false)
+            case .openVault:
                 return StoredShortcut(key: "e", command: true, shift: true, option: false, control: false)
             case .switchRightSidebarToFiles:
                 return StoredShortcut(key: "1", command: false, shift: false, option: false, control: true)
@@ -404,7 +412,7 @@ enum KeyboardShortcutSettings {
             case .hideFind:
                 return StoredShortcut(key: "f", command: true, shift: true, option: true, control: false)
             case .useSelectionForFind:
-                return StoredShortcut(key: "e", command: true, shift: false, option: false, control: false)
+                return .unbound
             case .toggleBrowserDeveloperTools:
                 // Safari default: Show Web Inspector.
                 return StoredShortcut(key: "i", command: true, shift: false, option: true, control: false)

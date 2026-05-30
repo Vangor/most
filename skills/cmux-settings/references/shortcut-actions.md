@@ -71,6 +71,8 @@ Values for `shortcuts.bindings.<action>`:
 
 - `shortcuts.bindings.toggleSidebar`
 - `shortcuts.bindings.focusRightSidebar`
+- `shortcuts.bindings.openFeed`
+- `shortcuts.bindings.openVault`
 - `shortcuts.bindings.switchRightSidebarToFiles`
 - `shortcuts.bindings.switchRightSidebarToFind`
 - `shortcuts.bindings.switchRightSidebarToSessions`

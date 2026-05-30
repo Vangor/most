@@ -5367,11 +5367,13 @@ final class AppDelegateShortcutRoutingTests: XCTestCase {
     // MARK: - Browser find shortcut routing tests
 
     func testBrowserFirstFindShortcutRoutingRecognizesBrowserLocalFindCommandFamily() {
+        // cmd-e (useSelectionForFind) is no longer a default shortcut; openFeed now owns cmd-e
+        // at the application level and is not a BrowserFindCommandEquivalent, so cmd-e no
+        // longer routes browser-first.
         let cases: [(name: String, modifiers: NSEvent.ModifierFlags, chars: String, keyCode: UInt16)] = [
             ("cmd-g", [.command], "g", 5),
             ("cmd-option-g", [.command, .option], "g", 5),
             ("cmd-option-shift-f", [.command, .option, .shift], "f", 3),
-            ("cmd-e", [.command], "e", 14),
         ]
 
         for testCase in cases {
