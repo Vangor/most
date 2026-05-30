@@ -3480,7 +3480,10 @@ final class SocketListenerAcceptPolicyTests: XCTestCase {
             "{ cd -- '/Users/lawrence/fun' 2>/dev/null || [ ! -d '/Users/lawrence/fun' ]; } && '/Users/lawrence/.bun/bin/opencode' '--session' 'ses_24b0be92affeVRRBplLmUzbXQl'"
         )
         XCTAssertNil(omx.resumeCommand)
-        XCTAssertNil(omc.resumeCommand)
+        XCTAssertEqual(
+            omc.resumeCommand,
+            "'/usr/local/bin/cmux' 'omc' '--resume' 'claude-session-123'"
+        )
     }
 
     func testRestorableAgentIndexLoadsLaunchCommandFromHookStore() throws {
