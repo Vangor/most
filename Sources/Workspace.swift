@@ -15865,12 +15865,43 @@ final class Workspace: Identifiable, ObservableObject {
     private func promptRenamePanel(tabId: TabID) {
         guard let panelId = panelIdFromSurfaceId(tabId),
               let panel = panels[panelId] else { return }
+        let currentTitle = panelCustomTitles[panelId] ?? panelTitles[panelId] ?? panel.displayTitle
+        guard let newName = Self.runRenameAlert(currentName: currentTitle) else { return }
+        setPanelCustomTitle(panelId: panelId, title: newName)
+    }
 
+    /// Finds the open panel whose restorable agent matches `sessionId`, shows
+    /// the shared rename dialog, and updates the panel custom title.
+    /// Returns the new name (trimmed) via `completion`, or `nil` if cancelled
+    /// or no matching panel was found. Callers (e.g. the session-index sidebar)
+    /// use the returned name to also update their persistent session-names store.
+    func promptRenameOpenSession(bySessionId sessionId: String, completion: @MainActor @escaping (String?) -> Void) {
+        // Search all panels in this workspace for a match.
+        for (panelId, agentSnapshot) in restoredAgentSnapshotsByPanelId
+        where agentSnapshot.sessionId == sessionId {
+            guard let panel = panels[panelId] else { continue }
+            let currentTitle = panelCustomTitles[panelId] ?? panelTitles[panelId] ?? panel.displayTitle
+            guard let newName = Self.runRenameAlert(currentName: currentTitle) else {
+                completion(nil)
+                return
+            }
+            setPanelCustomTitle(panelId: panelId, title: newName)
+            completion(newName)
+            return
+        }
+        // No open panel found for this session.
+        completion(nil)
+    }
+
+    /// Shows the rename NSAlert pre-filled with `currentName`. Returns the
+    /// trimmed new name on confirm, or `nil` on cancel / empty input.
+    /// Shared by both ContentView and RightSidebarToolPanel so the alert UI
+    /// is defined in exactly one place.
+    static func runRenameAlert(currentName: String) -> String? {
         let alert = NSAlert()
         alert.messageText = String(localized: "alert.renameTab.title", defaultValue: "Rename Tab")
         alert.informativeText = String(localized: "alert.renameTab.message", defaultValue: "Enter a custom name for this tab.")
-        let currentTitle = panelCustomTitles[panelId] ?? panelTitles[panelId] ?? panel.displayTitle
-        let input = NSTextField(string: currentTitle)
+        let input = NSTextField(string: currentName)
         input.placeholderString = String(localized: "alert.renameTab.placeholder", defaultValue: "Tab name")
         input.frame = NSRect(x: 0, y: 0, width: 240, height: 22)
         alert.accessoryView = input
@@ -15883,8 +15914,9 @@ final class Workspace: Identifiable, ObservableObject {
             input.selectText(nil)
         }
         let response = alert.runModal()
-        guard response == .alertFirstButtonReturn else { return }
-        setPanelCustomTitle(panelId: panelId, title: input.stringValue)
+        guard response == .alertFirstButtonReturn else { return nil }
+        let newName = input.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        return newName.isEmpty ? nil : newName
     }
 
     private static let bonsplitMoveNewWorkspaceDestinationId = "new-workspace"

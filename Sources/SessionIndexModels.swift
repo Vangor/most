@@ -258,6 +258,9 @@ struct SessionEntry: Identifiable, Hashable {
     /// Native session identifier for the agent's CLI (used to build the resume command).
     let sessionId: String
     let title: String
+    /// User-set custom name for this session, populated from the persisted session-names
+    /// store. Takes priority over `title`-derived display text in `displayTitle`.
+    var customName: String?
     let cwd: String?
     let gitBranch: String?
     let pullRequest: PullRequestLink?
@@ -284,6 +287,7 @@ struct SessionEntry: Identifiable, Hashable {
             agent: agent,
             sessionId: sessionId,
             title: title,
+            customName: customName,
             cwd: cwd,
             gitBranch: gitBranch,
             pullRequest: pullRequest,
@@ -295,6 +299,14 @@ struct SessionEntry: Identifiable, Hashable {
                 configDirectoryForResume: configDirectory
             )
         )
+    }
+
+    /// Returns a copy of this entry with `customName` set to the given value.
+    func withCustomName(_ name: String?) -> SessionEntry {
+        var copy = self
+        let trimmed = name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        copy.customName = trimmed.isEmpty ? nil : trimmed
+        return copy
     }
 
     /// Shell command that resumes this session in a new terminal, with the agent's
@@ -441,6 +453,10 @@ struct SessionEntry: Identifiable, Hashable {
     }
 
     var displayTitle: String {
+        // User-set custom name takes priority over everything else.
+        if let customName, !customName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return customName.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
         if agent == .claude {
             if let title = Self.claudeDisplayTitle(from: trimmed) {

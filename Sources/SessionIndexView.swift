@@ -58,6 +58,10 @@ struct SessionIndexView: View {
     @State private var openPopoverSection: SectionKey?
     @State private var previewEntry: SessionEntry?
     let onResume: ((SessionEntry) -> Void)?
+    /// Routes a session rename through the shared path (promptRenamePanel for
+    /// open sessions, NSAlert + store for closed sessions). Nil disables the
+    /// rename affordance in all rows.
+    let onRename: ((SessionEntry) -> Void)?
     /// Rows shown per section before "Show more" is tapped.
     private static let collapsedRowLimit = 5
     /// Scale multiplier from `sidebar-font-size` Ghostty config key. Loaded
@@ -201,6 +205,7 @@ struct SessionIndexView: View {
         let store = self.store
         let dragCoordinator = self.dragCoordinator
         let onResumeClosure = onResume
+        let onRenameClosure = onRename
         let gapActions = SectionGapActions(
             currentDraggedKey: { dragCoordinator.draggedKey },
             moveSection: { key, before in store.moveSection(key, before: before) },
@@ -255,6 +260,7 @@ struct SessionIndexView: View {
                                 }
                             },
                             onResume: onResumeClosure,
+                            onRename: onRenameClosure,
                             search: searchFn,
                             loadSnapshot: loadSnapshotFn
                         )
@@ -359,6 +365,10 @@ struct IndexSectionActions {
     let onPreviewEntry: (SessionEntry) -> Void
     let onDismissPreview: (SessionEntry.ID) -> Void
     let onResume: ((SessionEntry) -> Void)?
+    /// Triggers the rename dialog for a session row. Routes through the shared
+    /// rename path (promptRenamePanel for open sessions, NSAlert + store for
+    /// closed sessions). Nil means rename is not available in this context.
+    let onRename: ((SessionEntry) -> Void)?
     let search: SessionSearchFn
     let loadSnapshot: DirectorySnapshotFn
 }
@@ -421,7 +431,8 @@ private struct IndexSectionView: View, Equatable {
                                 actions.onDismissPreview(entry.id)
                             }
                         },
-                        onResume: actions.onResume
+                        onResume: actions.onResume,
+                        onRename: actions.onRename
                     )
                         .equatable()
                         .id(entry.id)
@@ -455,7 +466,8 @@ private struct IndexSectionView: View, Equatable {
                 section: section,
                 search: actions.search,
                 loadSnapshot: actions.loadSnapshot,
-                onResume: actions.onResume
+                onResume: actions.onResume,
+                onRename: actions.onRename
             )
         )
     }
@@ -594,6 +606,9 @@ private struct SessionRow: View, Equatable {
     var fontScale: CGFloat = 1.0
     let onPreviewPresentationChange: (Bool) -> Void
     let onResume: ((SessionEntry) -> Void)?
+    /// Triggers the rename dialog. Received as a closure from the parent action
+    /// bundle so the row never observes or references the store (snapshot-boundary policy).
+    let onRename: ((SessionEntry) -> Void)?
     @State private var isHovered: Bool = false
 
     private func rsScaled(_ base: CGFloat) -> CGFloat { base * fontScale }
@@ -647,7 +662,7 @@ private struct SessionRow: View, Equatable {
             .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
         }
         .contextMenu {
-            sessionRowMenuItems(entry: entry, onResume: onResume)
+            sessionRowMenuItems(entry: entry, onResume: onResume, onRename: onRename)
         }
     }
 
@@ -704,7 +719,19 @@ private struct SessionRow: View, Equatable {
 /// free `@ViewBuilder` so SessionRow and PopoverRow both attach the same set
 /// without duplicating the button list or the action helpers.
 @ViewBuilder
-private func sessionRowMenuItems(entry: SessionEntry, onResume: ((SessionEntry) -> Void)?) -> some View {
+private func sessionRowMenuItems(
+    entry: SessionEntry,
+    onResume: ((SessionEntry) -> Void)?,
+    onRename: ((SessionEntry) -> Void)? = nil
+) -> some View {
+    if let onRename {
+        Button {
+            onRename(entry)
+        } label: {
+            Text(String(localized: "sessionIndex.row.rename", defaultValue: "Rename…"))
+        }
+        Divider()
+    }
     if let onResume {
         Button {
             onResume(entry)
@@ -2180,6 +2207,7 @@ private struct SectionPopoverView: View {
     /// is an in-memory array slice, not repeated store round-trips.
     let loadSnapshot: DirectorySnapshotFn
     let onResume: ((SessionEntry) -> Void)?
+    let onRename: ((SessionEntry) -> Void)?
     let onDismiss: () -> Void
 
     @State private var query: String = ""
@@ -2290,10 +2318,10 @@ private struct SectionPopoverView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                     } else {
                         ForEach(loaded) { entry in
-                            PopoverRow(entry: entry, fontScale: fontScale) {
+                            PopoverRow(entry: entry, fontScale: fontScale, onActivate: {
                                 onResume?(entry)
                                 onDismiss()
-                            }
+                            }, onRename: onRename)
                             .equatable()
                         }
                         if hasMore {
@@ -2536,6 +2564,8 @@ private struct PopoverRow: View, Equatable {
     let entry: SessionEntry
     var fontScale: CGFloat = 1.0
     let onActivate: () -> Void
+    /// Rename closure, threaded as a value so the row satisfies the snapshot-boundary rule.
+    let onRename: ((SessionEntry) -> Void)?
 
     @State private var isHovered: Bool = false
 
@@ -2599,7 +2629,7 @@ private struct PopoverRow: View, Equatable {
         }
         .help(entry.cwdLabel ?? entry.displayTitle)
         .contextMenu {
-            sessionRowMenuItems(entry: entry, onResume: { _ in onActivate() })
+            sessionRowMenuItems(entry: entry, onResume: { _ in onActivate() }, onRename: onRename)
         }
     }
 }
@@ -2715,6 +2745,7 @@ struct SectionPopoverHost: NSViewRepresentable {
     let search: SessionSearchFn
     let loadSnapshot: DirectorySnapshotFn
     let onResume: ((SessionEntry) -> Void)?
+    let onRename: ((SessionEntry) -> Void)?
 
     func makeCoordinator() -> Coordinator {
         Coordinator(isPresented: $isPresented)
@@ -2734,7 +2765,8 @@ struct SectionPopoverHost: NSViewRepresentable {
             section: section,
             search: search,
             loadSnapshot: loadSnapshot,
-            onResume: onResume
+            onResume: onResume,
+            onRename: onRename
         )
         if isPresented {
             coordinator.present()
@@ -2773,6 +2805,7 @@ struct SectionPopoverHost: NSViewRepresentable {
         private var currentSearch: SessionSearchFn?
         private var currentLoadSnapshot: DirectorySnapshotFn?
         private var currentOnResume: ((SessionEntry) -> Void)?
+        private var currentOnRename: ((SessionEntry) -> Void)?
         private var lastRenderedSection: IndexSection?
         private var lastRenderedPresentationCount: Int?
         /// Bumped on every present(). Used as the SwiftUI view identity so each
@@ -2787,12 +2820,14 @@ struct SectionPopoverHost: NSViewRepresentable {
             section: IndexSection,
             search: @escaping SessionSearchFn,
             loadSnapshot: @escaping DirectorySnapshotFn,
-            onResume: ((SessionEntry) -> Void)?
+            onResume: ((SessionEntry) -> Void)?,
+            onRename: ((SessionEntry) -> Void)? = nil
         ) {
             currentSection = section
             currentSearch = search
             currentLoadSnapshot = loadSnapshot
             currentOnResume = onResume
+            currentOnRename = onRename
             // When hidden, defer rebuilding the hosting view until `present()`.
             // Rewriting rootView + forcing layout on every parent re-render was
             // the 100% CPU loop behind #3010.
@@ -2812,13 +2847,15 @@ struct SectionPopoverHost: NSViewRepresentable {
                   let loadSnapshot = currentLoadSnapshot else { return }
             debugRefreshContentCallCount += 1
             let onResume = currentOnResume
+            let onRename = currentOnRename
             let identity = presentationCount
             hostingController.rootView = AnyView(
                 SectionPopoverView(
                     section: section,
                     search: search,
                     loadSnapshot: loadSnapshot,
-                    onResume: onResume
+                    onResume: onResume,
+                    onRename: onRename
                 ) { [weak self] in
                     self?.closeFromContent()
                 }
