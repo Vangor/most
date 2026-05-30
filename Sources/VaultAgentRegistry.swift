@@ -3,9 +3,44 @@ import OSLog
 
 struct CmuxVaultConfigDefinition: Codable, Hashable, Sendable {
     var agents: [CmuxVaultAgentRegistration]
+    /// Maximum age of entries surfaced in the Vault sidebar, in days.
+    /// Absent or 0 = no cutoff (all entries shown, today's behavior).
+    /// Must be a finite positive integer; invalid values are ignored.
+    var maxAgeDays: Int?
+    /// Maximum number of entries loaded per agent during the initial `scanAll()` scan.
+    /// Absent = falls back to the built-in default of 30.
+    /// Must be a finite positive integer; invalid values are ignored.
+    var maxEntriesPerAgent: Int?
 
-    init(agents: [CmuxVaultAgentRegistration] = []) {
+    private enum CodingKeys: String, CodingKey {
+        case agents, maxAgeDays, maxEntriesPerAgent
+    }
+
+    init(
+        agents: [CmuxVaultAgentRegistration] = [],
+        maxAgeDays: Int? = nil,
+        maxEntriesPerAgent: Int? = nil
+    ) {
         self.agents = agents
+        self.maxAgeDays = maxAgeDays
+        self.maxEntriesPerAgent = maxEntriesPerAgent
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        agents = try container.decodeIfPresent([CmuxVaultAgentRegistration].self, forKey: .agents) ?? []
+
+        if let rawMaxAgeDays = try container.decodeIfPresent(Int.self, forKey: .maxAgeDays) {
+            maxAgeDays = (rawMaxAgeDays > 0) ? rawMaxAgeDays : nil
+        } else {
+            maxAgeDays = nil
+        }
+
+        if let rawMaxEntriesPerAgent = try container.decodeIfPresent(Int.self, forKey: .maxEntriesPerAgent) {
+            maxEntriesPerAgent = (rawMaxEntriesPerAgent > 0) ? rawMaxEntriesPerAgent : nil
+        } else {
+            maxEntriesPerAgent = nil
+        }
     }
 }
 
@@ -312,8 +347,16 @@ struct CmuxVaultAgentRegistry: Sendable {
     private static let logger = Logger(subsystem: "ai.manaflow.cmux", category: "VaultAgentRegistry")
 
     var registrations: [CmuxVaultAgentRegistration]
+    /// Parsed from `vault.maxAgeDays` in the global cmux.json. nil = no cutoff.
+    var maxAgeDays: Int?
+    /// Parsed from `vault.maxEntriesPerAgent` in the global cmux.json. nil = use built-in default.
+    var maxEntriesPerAgent: Int?
 
-    init(registrations: [CmuxVaultAgentRegistration]) {
+    init(
+        registrations: [CmuxVaultAgentRegistration],
+        maxAgeDays: Int? = nil,
+        maxEntriesPerAgent: Int? = nil
+    ) {
         var ordered: [CmuxVaultAgentRegistration] = []
         var indexesByID: [String: Int] = [:]
         for registration in registrations {
@@ -325,6 +368,8 @@ struct CmuxVaultAgentRegistry: Sendable {
             }
         }
         self.registrations = ordered
+        self.maxAgeDays = maxAgeDays
+        self.maxEntriesPerAgent = maxEntriesPerAgent
     }
 
     func registration(id: String) -> CmuxVaultAgentRegistration? {
@@ -343,7 +388,12 @@ struct CmuxVaultAgentRegistry: Sendable {
               !agents.isEmpty else {
             return self
         }
-        return CmuxVaultAgentRegistry(registrations: registrations + agents)
+        // Display limit settings come from the global config only; preserve them.
+        return CmuxVaultAgentRegistry(
+            registrations: registrations + agents,
+            maxAgeDays: maxAgeDays,
+            maxEntriesPerAgent: maxEntriesPerAgent
+        )
     }
 
     static func load(
@@ -357,11 +407,30 @@ struct CmuxVaultAgentRegistry: Sendable {
             CmuxVaultAgentRegistration.builtInAntigravity,
             CmuxVaultAgentRegistration.builtInGrok,
         ]
-        for path in configPaths(homeDirectory: homeDirectory, workingDirectory: workingDirectory, environment: environment, fileManager: fileManager) {
+        let paths = configPaths(homeDirectory: homeDirectory, workingDirectory: workingDirectory, environment: environment, fileManager: fileManager)
+
+        // Display limits come from the GLOBAL config only (the first path).
+        // Project-local configs contribute agent registrations only.
+        let resolvedMaxAgeDays: Int?
+        let resolvedMaxEntriesPerAgent: Int?
+        if let globalPath = paths.first,
+           let globalConfig = decodeConfig(at: globalPath, fileManager: fileManager) {
+            resolvedMaxAgeDays = globalConfig.vault?.maxAgeDays
+            resolvedMaxEntriesPerAgent = globalConfig.vault?.maxEntriesPerAgent
+        } else {
+            resolvedMaxAgeDays = nil
+            resolvedMaxEntriesPerAgent = nil
+        }
+
+        for path in paths {
             guard let config = decodeConfig(at: path, fileManager: fileManager) else { continue }
             registrations.append(contentsOf: config.vault?.agents ?? [])
         }
-        return CmuxVaultAgentRegistry(registrations: registrations)
+        return CmuxVaultAgentRegistry(
+            registrations: registrations,
+            maxAgeDays: resolvedMaxAgeDays,
+            maxEntriesPerAgent: resolvedMaxEntriesPerAgent
+        )
     }
 
     private static func configPaths(
