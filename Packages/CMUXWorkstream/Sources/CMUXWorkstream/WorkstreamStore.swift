@@ -117,7 +117,17 @@ public final class WorkstreamStore {
     /// Applies an inbound wire frame. Creates or updates a
     /// `WorkstreamItem`, enforces the ring-buffer cap, and appends to
     /// the JSONL log.
+    ///
+    /// When the event is a `SessionEnd`, pending items for that workstream
+    /// are immediately expired before the new telemetry item is inserted.
+    /// This covers remote agents whose host process the Mac cannot watch
+    /// via kqueue — the agent sends a SessionEnd hook on exit and we use
+    /// that signal to transition orphaned pending cards to `.expired` so
+    /// `clearInactionable()` can remove them.
     public func ingest(_ event: WorkstreamEvent) {
+        if event.hookEventName == .sessionEnd {
+            expireItems(forWorkstreamId: event.sessionId)
+        }
         let item = makeItem(from: event)
         insert(item)
         updateContextIndex(with: item)
@@ -129,6 +139,29 @@ public final class WorkstreamStore {
     }
 
     // MARK: - Actions
+
+    /// Removes a single item unconditionally, regardless of status
+    /// (including `.pending`). This is the per-item manual-dismiss path
+    /// and the only place item removal by id is authored. Every UI surface
+    /// that needs to remove one card (e.g. a row's ✕ button) calls this.
+    public func dismiss(id: UUID) {
+        items.removeAll { $0.id == id }
+    }
+
+    /// Marks every still-pending item in the given workstream as `.expired`.
+    /// Called when a SessionEnd event arrives for that workstream, so
+    /// remote/local agent death that cannot be caught by kqueue (because
+    /// the PID belongs to a remote host) still transitions cards out of
+    /// the blocked-pending state. `clearInactionable()` then removes them.
+    public func expireItems(forWorkstreamId workstreamId: String) {
+        let now = clock()
+        for idx in items.indices {
+            guard items[idx].status.isPending,
+                  items[idx].workstreamId == workstreamId else { continue }
+            items[idx].status = .expired(at: now)
+            items[idx].updatedAt = now
+        }
+    }
 
     /// Sends a user-initiated action through the transport and marks the
     /// corresponding item resolved on success.

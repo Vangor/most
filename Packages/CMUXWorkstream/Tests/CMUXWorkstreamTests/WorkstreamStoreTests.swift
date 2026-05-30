@@ -210,6 +210,123 @@ struct WorkstreamStoreTests {
         #expect(item.context?.allowedPrompts.first?.tool == "Bash")
         #expect(item.context?.allowedPrompts.first?.prompt == "run reload.sh --tag feedctx")
     }
+
+    // MARK: - dismiss(id:) tests
+
+    @Test("dismiss(id:) removes a pending item unconditionally")
+    func dismissPendingItem() {
+        let store = WorkstreamStore(ringCapacity: 10)
+        store.ingest(.permission("s1", requestId: "r1"))
+        store.ingest(.permission("s1", requestId: "r2"))
+        let targetId = store.items[0].id
+        #expect(store.items.count == 2)
+        #expect(store.items[0].status.isPending)
+
+        store.dismiss(id: targetId)
+
+        #expect(store.items.count == 1)
+        #expect(store.items[0].id != targetId)
+        // Remaining item is unaffected.
+        #expect(store.items[0].status.isPending)
+    }
+
+    @Test("dismiss(id:) removes a resolved item")
+    func dismissResolvedItem() async throws {
+        let store = WorkstreamStore(ringCapacity: 10)
+        store.ingest(.permission("s1", requestId: "r1"))
+        let itemId = store.items[0].id
+        try await store.send(.approvePermission(itemId: itemId, mode: .once))
+        #expect(!store.items[0].status.isPending)
+
+        store.dismiss(id: itemId)
+
+        #expect(store.items.isEmpty)
+    }
+
+    @Test("dismiss(id:) is a no-op for an unknown id")
+    func dismissUnknownId() {
+        let store = WorkstreamStore(ringCapacity: 10)
+        store.ingest(.permission("s1", requestId: "r1"))
+        #expect(store.items.count == 1)
+
+        store.dismiss(id: UUID())
+
+        #expect(store.items.count == 1)
+    }
+
+    // MARK: - expireItems(forWorkstreamId:) + session-end tests
+
+    @Test("expireItems(forWorkstreamId:) marks matching pending items expired")
+    func expireByWorkstreamId() {
+        let clock = TestClock(initial: Date(timeIntervalSince1970: 0))
+        let store = WorkstreamStore(ringCapacity: 10, clock: { clock.now })
+        store.ingest(.permission("ws-a", requestId: "r1", at: clock.now))
+        store.ingest(.permission("ws-a", requestId: "r2", at: clock.now))
+        store.ingest(.permission("ws-b", requestId: "r3", at: clock.now))
+
+        store.expireItems(forWorkstreamId: "ws-a")
+
+        if case .expired = store.items[0].status {} else {
+            Issue.record("ws-a item[0] should be expired")
+        }
+        if case .expired = store.items[1].status {} else {
+            Issue.record("ws-a item[1] should be expired")
+        }
+        // ws-b item must remain pending — different workstream.
+        #expect(store.items[2].status.isPending)
+    }
+
+    @Test("expireItems(forWorkstreamId:) leaves already-resolved items unchanged")
+    func expireByWorkstreamIdSkipsResolved() async throws {
+        let store = WorkstreamStore(ringCapacity: 10)
+        store.ingest(.permission("ws-a", requestId: "r1"))
+        let itemId = store.items[0].id
+        try await store.send(.approvePermission(itemId: itemId, mode: .once))
+
+        store.expireItems(forWorkstreamId: "ws-a")
+
+        // Resolved status must survive: expireItems only touches .pending.
+        if case .resolved(let decision, _) = store.items[0].status {
+            #expect(decision == .permission(.once))
+        } else {
+            Issue.record("resolved item should not be overwritten by expireItems(forWorkstreamId:)")
+        }
+    }
+
+    @Test("ingest of SessionEnd expires pending items for that workstream then clearInactionable removes them")
+    func sessionEndExpiresAndClearRemoves() {
+        let store = WorkstreamStore(ringCapacity: 10)
+        store.ingest(.permission("ws-dying", requestId: "r1"))
+        store.ingest(.permission("ws-alive", requestId: "r2"))
+        #expect(store.pending.count == 2)
+
+        // Simulate the agent sending a SessionEnd hook event.
+        store.ingest(WorkstreamEvent(
+            sessionId: "ws-dying",
+            hookEventName: .sessionEnd,
+            source: "claude"
+        ))
+
+        // ws-dying's pending item should now be expired.
+        let dyingItem = store.items.first { $0.workstreamId == "ws-dying" && $0.kind == .permissionRequest }
+        if let dyingItem {
+            if case .expired = dyingItem.status {} else {
+                Issue.record("pending item for ws-dying should be expired after SessionEnd")
+            }
+        } else {
+            Issue.record("could not find ws-dying permission item")
+        }
+        // ws-alive is untouched.
+        let aliveItem = store.items.first { $0.workstreamId == "ws-alive" }
+        #expect(aliveItem?.status.isPending == true)
+
+        // clearInactionable removes the expired item + the sessionEnd telemetry,
+        // but leaves ws-alive's pending item.
+        store.clearInactionable()
+        #expect(store.items.count == 1)
+        #expect(store.items[0].workstreamId == "ws-alive")
+        #expect(store.items[0].status.isPending)
+    }
 }
 
 /// Mutable clock wrapper safe to capture by a `@Sendable` closure in tests.

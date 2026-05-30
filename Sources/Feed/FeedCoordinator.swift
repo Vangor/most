@@ -254,7 +254,7 @@ enum FeedCoordinatorTestHooks {
 }
 #endif
 
-// MARK: - Clear inactionable
+// MARK: - Clear inactionable + per-item dismiss
 
 extension FeedCoordinator {
     /// Removes all resolved, expired, and telemetry items from the
@@ -263,6 +263,16 @@ extension FeedCoordinator {
     @MainActor
     func clearInactionableItems() {
         store?.clearInactionable()
+    }
+
+    /// Removes a single feed item unconditionally regardless of status
+    /// (including `.pending`). This is the per-row dismiss path — the
+    /// user can remove any card they no longer need, even if the agent
+    /// is still alive and the item is still technically actionable.
+    /// One authoritative mutation path: every dismiss surface calls this.
+    @MainActor
+    func dismissItem(id: UUID) {
+        store?.dismiss(id: id)
     }
 }
 
