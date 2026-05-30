@@ -132,6 +132,15 @@ This creates an isolated app with its own name, bundle ID, socket, and derived d
 
 Before launching a new tagged run, clean up any older tags you started in this session (quit old tagged app + remove its `/tmp` socket/derived data).
 
+`dogfood-release.sh` (most fork) = build the signed Release, install it to `/Applications/most.app`, and bake in the remote-daemon dev-build flag:
+
+```bash
+./scripts/dogfood-release.sh            # build + install
+./scripts/dogfood-release.sh --launch   # build + install + open
+```
+
+This is the canonical local build for dogfooding the production-id Release (`com.4etverg.most`). It injects `CMUX_REMOTE_DAEMON_ALLOW_LOCAL_BUILD=1` and `CMUXTERM_REPO_ROOT` into `LSEnvironment` (mirroring what `reload.sh` does for DEV) so the app can provision a fresh `cmuxd-remote` to SSH hosts. **Without this, the in-app Claude-status feature silently breaks on a locally built Release** — no remote sidebar pills and `cmux: unknown command "hooks"` when Claude runs on the remote — because the app reuses a stale cached daemon at the bare-version path. The build machine needs `go` + this repo's source. A public release must instead embed `CMUXRemoteDaemonManifestJSON` via CI. See `docs/remote-daemon-spec.md` §3.7.
+
 ## Cloud VM secrets
 
 Cloud VM build, test, and local dev scripts use provider secrets from `~/.secrets/cmux.env`.

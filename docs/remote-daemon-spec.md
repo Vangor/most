@@ -60,6 +60,17 @@ This is a **living implementation spec** (also called an **execution spec**): a 
 - `DONE` release and nightly apps embed a compact `CMUXRemoteDaemonManifestJSON` in `Info.plist` with exact asset URLs and SHA-256 digests.
 - `DONE` `cmux remote-daemon-status` exposes the current manifest entry, local cache verification state, release download command, and GitHub attestation verification command.
 
+### 3.7 Local (non-CI) builds — `most` fork dogfood
+
+Only **release/nightly CI** injects `CMUXRemoteDaemonManifestJSON` (`.github/workflows/release.yml`, `nightly.yml`). A **locally built** Release `.app` (e.g. a `most` dogfood build copied to `/Applications`) has **no manifest**, so daemon provisioning depends on the local-build fallback in `Workspace.swift` → `buildLocalDaemonBinary` (`go build ./daemon/remote/cmd/cmuxd-remote`), which is gated behind the **`CMUX_REMOTE_DAEMON_ALLOW_LOCAL_BUILD=1`** environment variable.
+
+Two traps that silently break the remote claude-status feature (no sidebar pills + `cmux: unknown command "hooks"` on the remote) on a locally built Release:
+
+1. **The flag is read from the process environment, not a bare Info.plist key.** It must live under the `LSEnvironment` dict so LaunchServices materializes it for GUI launches (this is how `scripts/reload.sh:741` wires it for DEV). A top-level Info.plist key does nothing.
+2. **Daemon version collision.** `remoteDaemonVersion()` returns the bare marketing version (e.g. `0.64.10`) unless the allow-local-build flag is set, in which case it returns `0.64.10-dev-<source-fingerprint>`. The remote bootstrap probe (`probeRemoteBootstrapStateLocked`) only checks **path existence** of `~/.cmux/bin/cmuxd-remote/<version>/<os>-<arch>/cmuxd-remote` and the capability gate does not cover CLI commands like `hooks`/`omc`. So a bare-version build will happily **reuse a stale cached `cmuxd-remote`** that predates those commands. The `-dev-<fingerprint>` suffix (only present with the flag) is what avoids the collision and forces a fresh, capability-current binary.
+
+`scripts/dogfood-release.sh` builds the signed Release, injects `CMUX_REMOTE_DAEMON_ALLOW_LOCAL_BUILD=1` and `CMUXTERM_REPO_ROOT` into `LSEnvironment`, re-signs, and installs to `/Applications/most.app`. The build machine therefore needs `go` and this repo's source. A **public** `most` release must instead publish `cmuxd-remote` assets and inject the manifest via CI (`scripts/build_remote_daemon_release_assets.sh`) — see the LAST STAGE migration item.
+
 ### 3.3 Error Surfacing
 - `DONE` remote errors are surfaced in sidebar status + logs + notifications.
 - `DONE` reconnect retry count/time is included in surfaced error text (for example, `retry 1 in 4s`).
