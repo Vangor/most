@@ -484,7 +484,16 @@ struct SocketControlSettings {
                 ? preferredPath
                 : userScopedPath
         case .socket(let ownerUserID) where ownerUserID == currentUserID:
-            return userScopedPath
+            // A same-user socket at the stable path is either a live sibling instance
+            // (holds the socket-path lock -> coexist on the user-scoped path) or a stale
+            // leftover from an unclean exit (crash / SIGKILL / force-quit). The
+            // reclaimability check is lock-based (non-blocking flock + reusable marker),
+            // never a connecting liveness probe, so it is safe on the startup main thread.
+            // Without it, a stale stable socket permanently forces every later launch onto
+            // the user-scoped path and the CLI can never find `most.sock`.
+            return stableDefaultSocketCanBeReclaimed(preferredPath)
+                ? preferredPath
+                : userScopedPath
         case .socket, .other, .inaccessible:
             return preferredPath
         }
