@@ -456,7 +456,21 @@ enum AgentResumeCommandBuilder {
             }
             guard let preserved = AgentLaunchSanitizer.preservedArguments(kind: "opencode", args: args) else { return nil }
             return [original.executable, "omo", "--session", sessionId] + preserved
-        case "omx", "omc":
+        // omc wraps Claude Code; `cmux omc --resume <id>` forwards --resume to omc→claude.
+        // The daemon's runOMCRelay passes all args through to the omc executable unchanged.
+        case "omc":
+            let original = commandParts(
+                launchCommand: launchCommand,
+                fallbackExecutable: "cmux"
+            )
+            var args = original.tail
+            if args.first == "omc" {
+                args.removeFirst()
+            }
+            guard let preserved = AgentLaunchSanitizer.preservedArguments(kind: "claude", args: args) else { return nil }
+            return [original.executable, "omc", "--resume", sessionId] + preserved
+        // omx: wrapping target is unconfirmed; leave as non-restorable until verified.
+        case "omx":
             return nil
         default:
             break
@@ -627,7 +641,20 @@ enum AgentResumeCommandBuilder {
             }
             guard let preserved = AgentLaunchSanitizer.preservedArguments(kind: "opencode", args: args) else { return nil }
             return [original.executable, "omo", "--session", sessionId, "--fork"] + preserved
-        case "omx", "omc":
+        // omc wraps Claude Code; fork resumes with --resume + --fork-session, mirroring the direct claude fork case.
+        case "omc":
+            let original = commandParts(
+                launchCommand: launchCommand,
+                fallbackExecutable: "cmux"
+            )
+            var args = original.tail
+            if args.first == "omc" {
+                args.removeFirst()
+            }
+            guard let preserved = AgentLaunchSanitizer.preservedArguments(kind: "claude", args: args) else { return nil }
+            return [original.executable, "omc", "--resume", sessionId, "--fork-session"] + preserved
+        // omx: wrapping target is unconfirmed; leave as non-forkable until verified.
+        case "omx":
             return nil
         default:
             break
