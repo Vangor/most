@@ -1,0 +1,83 @@
+# ---------------------------------------------------------------------------
+# Publish cmuxd-remote relay binaries + manifest to a Vangor/most GitHub release
+# ---------------------------------------------------------------------------
+#
+# What this does
+#   Builds ONLY the `cmuxd-remote` relay binaries (4 targets: darwin/linux ×
+#   arm64/amd64, cross-compiled with CGO disabled) plus their checksums and
+#   manifest, and attaches all 6 artifacts to a GitHub release on Vangor/most.
+#   There is NO app build and NO Apple code signing here — this workflow is
+#   deliberately decoupled from the full release/nightly app pipelines.
+#
+# Why it exists
+#   A `most.app` embeds a manifest (`CMUXRemoteDaemonManifestJSON`) whose
+#   `releaseURL` points at exactly these assets. At runtime the app fetches the
+#   matching `cmuxd-remote-<goos>-<goarch>` binary, verifies it against the
+#   SHA-256 in `cmuxd-remote-checksums.txt` / the manifest, and pushes it to the
+#   SSH host to provide remote Claude-status telemetry. These assets are what
+#   makes that download work without bundling Go + repo source into the app.
+#
+# Hard requirements (read before dispatching)
+#   * The target repo (Vangor/most) MUST be PUBLIC. The app downloads these
+#     assets unauthenticated; a private repo returns 404 and the feature breaks.
+#   * `inputs.version` MUST equal the app's CFBundleShortVersionString
+#     (e.g. 0.64.10). If it does not match, the app ignores the manifest and
+#     silently falls back, so no remote daemon is provisioned.
+#   * The app must be built WITHOUT `CMUX_REMOTE_DAEMON_ALLOW_LOCAL_BUILD=1`.
+#     That dev flag and the embedded manifest are mutually exclusive: with the
+#     flag set the app builds a local daemon and never consults the manifest.
+#     See docs/remote-daemon-spec.md §3.7.
+# ---------------------------------------------------------------------------
+
+name: Publish remote daemon assets
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "App version — MUST equal CFBundleShortVersionString (e.g. 0.64.10)"
+        required: true
+      tag:
+        # Recommend a dedicated tag like remote-daemon-v<version> (e.g.
+        # remote-daemon-v0.64.10). No auto-default: workflow_dispatch input
+        # defaults are literal strings and cannot reference sibling inputs
+        # (`${{ inputs.version }}` would render verbatim), so the tag is required.
+        description: "Release tag to attach assets to (recommend remote-daemon-v<version>, e.g. remote-daemon-v0.64.10)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+        with:
+          go-version-file: daemon/remote/go.mod
+          cache-dependency-path: daemon/remote/go.sum
+
+      - name: Build cmuxd-remote release assets
+        run: |
+          ./scripts/build_remote_daemon_release_assets.sh \
+            --version "${{ inputs.version }}" \
+            --release-tag "${{ inputs.tag }}" \
+            --repo "Vangor/most" \
+            --output-dir remote-daemon-assets
+
+      - name: Upload cmuxd-remote assets to release
+        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3.0.0
+        with:
+          tag_name: ${{ inputs.tag }}
+          fail_on_unmatched_files: true
+          files: |
+            remote-daemon-assets/cmuxd-remote-darwin-arm64
+            remote-daemon-assets/cmuxd-remote-darwin-amd64
+            remote-daemon-assets/cmuxd-remote-linux-arm64
+            remote-daemon-assets/cmuxd-remote-linux-amd64
+            remote-daemon-assets/cmuxd-remote-checksums.txt
+            remote-daemon-assets/cmuxd-remote-manifest.json
