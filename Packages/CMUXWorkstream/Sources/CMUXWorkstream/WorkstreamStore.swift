@@ -213,6 +213,22 @@ public final class WorkstreamStore {
         )
     }
 
+    /// Removes all resolved and expired items from the in-memory ring.
+    /// Telemetry items are also removed. Pending (still-actionable) items
+    /// are left untouched. This is the single authoritative mutation path
+    /// for "clear inactionable messages" — every UI surface calls this
+    /// one method rather than duplicating the predicate.
+    public func clearInactionable() {
+        items.removeAll { item in
+            switch item.status {
+            case .pending:
+                return false
+            case .resolved, .expired, .telemetry:
+                return true
+            }
+        }
+    }
+
     /// Marks every pending item with `ppid` as `.expired`. Meant to
     /// be called from a kqueue/DispatchSource process-exit handler
     /// so the exact moment an agent dies, its pending cards close.

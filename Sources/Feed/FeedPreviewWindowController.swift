@@ -154,7 +154,8 @@ private enum FeedPreviewActions {
                 print("preview.exitPlan \(id) \(mode) feedback=\(feedback ?? "nil")")
             },
             jump: { ws in print("preview.jump \(ws)") },
-            sendText: { ws, text in print("preview.sendText \(ws) \(text)") }
+            sendText: { ws, text in print("preview.sendText \(ws) \(text)") },
+            clearInactionable: { print("preview.clearInactionable") }
         )
     }
 }

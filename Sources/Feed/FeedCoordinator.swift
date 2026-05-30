@@ -254,6 +254,18 @@ enum FeedCoordinatorTestHooks {
 }
 #endif
 
+// MARK: - Clear inactionable
+
+extension FeedCoordinator {
+    /// Removes all resolved, expired, and telemetry items from the
+    /// in-memory store. Delegates to `WorkstreamStore.clearInactionable()`
+    /// so the predicate lives in exactly one place.
+    @MainActor
+    func clearInactionableItems() {
+        store?.clearInactionable()
+    }
+}
+
 // MARK: - Socket-layer helpers
 
 extension FeedCoordinator {

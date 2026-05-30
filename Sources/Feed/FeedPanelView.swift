@@ -76,9 +76,20 @@ struct FeedPanelView: View {
     /// Scale multiplier derived from `sidebar-font-size`. Default 1.0 = no change.
     var fontScale: CGFloat = 1.0
 
+    /// True when there are non-pending items the user can clear.
+    private var hasInactionableItems: Bool {
+        viewModel.items.contains { item in
+            switch item.status {
+            case .pending: return false
+            case .resolved, .expired, .telemetry: return true
+            }
+        }
+    }
+
     var body: some View {
+        let rowActions = FeedRowActions.bound()
         VStack(spacing: 0) {
-            controlBar
+            controlBar(rowActions: rowActions)
             FeedListView(
                 filter: filter,
                 items: viewModel.items,
@@ -90,18 +101,18 @@ struct FeedPanelView: View {
         }
     }
 
-    private var controlBar: some View {
+    private func controlBar(rowActions: FeedRowActions) -> some View {
         Group {
             #if compiler(>=6.2)
             if #available(macOS 26.0, *) {
                 GlassEffectContainer(spacing: 6) {
-                    controlBarContent
+                    controlBarContent(rowActions: rowActions)
                 }
             } else {
-                controlBarContent
+                controlBarContent(rowActions: rowActions)
             }
             #else
-            controlBarContent
+            controlBarContent(rowActions: rowActions)
             #endif
         }
         .rightSidebarChromeBar()
@@ -109,7 +120,7 @@ struct FeedPanelView: View {
         .reportRightSidebarChromeGeometryForBonsplitUITest(role: .secondaryBar, isVisible: true, titlebarHeight: RightSidebarChromeMetrics.secondaryBarHeight)
     }
 
-    private var controlBarContent: some View {
+    private func controlBarContent(rowActions: FeedRowActions) -> some View {
         HStack(spacing: 6) {
             ForEach(Filter.allCases) { f in
                 FeedSecondaryFilterButton(
@@ -121,6 +132,11 @@ struct FeedPanelView: View {
                 }
             }
             Spacer(minLength: 4)
+            if hasInactionableItems {
+                FeedClearButton(fontScale: fontScale) {
+                    rowActions.clearInactionable()
+                }
+            }
         }
     }
 }
@@ -162,6 +178,48 @@ private struct FeedSecondaryFilterButton: View {
         .buttonStyle(.plain)
         .onHover { isHovered = $0 }
         .help(filter.label)
+    }
+}
+
+/// Compact "Clear" button shown in the control bar when there are
+/// resolved/expired/telemetry items the user can dismiss. Uses the same
+/// chrome pill style as the filter buttons for visual consistency.
+private struct FeedClearButton: View {
+    var fontScale: CGFloat = 1.0
+    let action: () -> Void
+    @State private var isHovered = false
+
+    private func rsScaled(_ base: CGFloat) -> CGFloat { base * fontScale }
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 3) {
+                Image(systemName: "xmark.circle")
+                    .symbolRenderingMode(.monochrome)
+                    .font(
+                        .system(
+                            size: rsScaled(RightSidebarChromeControlStyle.secondaryIconSize),
+                            weight: RightSidebarChromeControlStyle.iconWeight
+                        )
+                    )
+                Text(String(localized: "feed.clear.button", defaultValue: "Clear"))
+                    .font(
+                        .system(
+                            size: rsScaled(RightSidebarChromeControlStyle.labelSize),
+                            weight: RightSidebarChromeControlStyle.labelWeight
+                        )
+                    )
+            }
+            .rightSidebarChromePill(
+                isSelected: false,
+                isHovered: isHovered,
+                geometryKeyPrefix: "rightSidebarSecondaryControl_feed_clear"
+            )
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
+        .help(String(localized: "feed.clear.tooltip", defaultValue: "Clear resolved and dismissed messages"))
+        .accessibilityIdentifier("FeedClearButton")
     }
 }
 
@@ -596,14 +654,14 @@ private struct FeedListView: View {
                           defaultValue: "No pending decisions")
                  : String(localized: "feed.empty.activity.title",
                           defaultValue: "No activity yet"))
-                .font(.system(size: 12))
+                .font(.system(size: fontScale * 13))
                 .foregroundColor(.secondary)
             Text(filter == .actionable
                  ? String(localized: "feed.empty.actionable.subtitle",
                           defaultValue: "Permission, plan, and question requests from AI agents will appear here.")
                  : String(localized: "feed.empty.activity.subtitle",
                           defaultValue: "Agent decisions and todo-list updates will appear here."))
-                .font(.system(size: 11))
+                .font(.system(size: fontScale * 12))
                 .foregroundColor(.secondary.opacity(0.7))
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 16)
@@ -946,6 +1004,10 @@ struct FeedRowActions {
     /// presses Return. Used by Stop-kind cards so the user can nudge
     /// Claude without switching focus to the terminal.
     let sendText: (String, String) -> Void
+    /// Removes all resolved, expired, and telemetry items from the feed.
+    /// Single shared action path — every clear surface (button, future
+    /// keyboard shortcut, context menu) calls this one closure.
+    let clearInactionable: () -> Void
 
     static func bound() -> FeedRowActions {
         FeedRowActions(
@@ -984,6 +1046,11 @@ struct FeedRowActions {
                         workstreamId: workstreamId,
                         text: text
                     )
+                }
+            },
+            clearInactionable: {
+                Task { @MainActor in
+                    FeedCoordinator.shared.clearInactionableItems()
                 }
             }
         )
@@ -1038,10 +1105,10 @@ struct FeedItemRow: View, Equatable {
         VStack(alignment: .leading, spacing: 10) {
             chipHeader
             if let context = displayContext {
-                FeedContextBlock(context: context, source: snapshot.source)
+                FeedContextBlock(context: context, source: snapshot.source, fontScale: fontScale)
             } else if let echo = promptEcho, !echo.isEmpty {
                 Text(echo)
-                    .font(.system(size: rsScaled(11)))
+                    .font(.system(size: rsScaled(13)))
                     .foregroundColor(.secondary)
                     .lineLimit(2)
                     .truncationMode(.tail)
@@ -1377,6 +1444,7 @@ struct FeedItemRow: View, Equatable {
 private struct FeedContextBlock: View {
     let context: WorkstreamContext
     let source: WorkstreamSource
+    var fontScale: CGFloat = 1.0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -1385,7 +1453,8 @@ private struct FeedContextBlock: View {
                     label: String(localized: "feed.context.you", defaultValue: "You:"),
                     text: user,
                     labelColor: .secondary,
-                    textColor: .secondary
+                    textColor: .secondary,
+                    fontScale: fontScale
                 )
             }
             if let preamble = context.assistantPreamble {
@@ -1394,7 +1463,8 @@ private struct FeedContextBlock: View {
                     text: preamble,
                     labelColor: .secondary,
                     textColor: .secondary,
-                    rendersMarkdown: source == .claude
+                    rendersMarkdown: source == .claude,
+                    fontScale: fontScale
                 )
             }
             if let plan = context.planSummary {
@@ -1403,7 +1473,8 @@ private struct FeedContextBlock: View {
                     text: plan,
                     labelColor: Color.purple.opacity(0.85),
                     textColor: .secondary,
-                    rendersMarkdown: source == .claude
+                    rendersMarkdown: source == .claude,
+                    fontScale: fontScale
                 )
             }
         }
@@ -1421,22 +1492,25 @@ private struct FeedLabeledTextRow: View {
     let labelColor: Color
     let textColor: Color
     var rendersMarkdown: Bool = false
+    var fontScale: CGFloat = 1.0
+
+    private func rsScaled(_ base: CGFloat) -> CGFloat { base * fontScale }
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
             Text(label)
-                .font(.system(size: 10, weight: .semibold))
+                .font(.system(size: rsScaled(11), weight: .semibold))
                 .foregroundColor(labelColor)
-                .frame(width: 48, alignment: .leading)
+                .frame(width: rsScaled(48), alignment: .leading)
             if rendersMarkdown {
                 FeedMarkdownInlineText(
                     text: text,
-                    fontSize: 11,
+                    fontSize: rsScaled(13),
                     foregroundColor: textColor
                 )
             } else {
                 Text(text)
-                    .font(.system(size: 11))
+                    .font(.system(size: rsScaled(13)))
                     .foregroundColor(textColor)
                     .fixedSize(horizontal: false, vertical: true)
             }

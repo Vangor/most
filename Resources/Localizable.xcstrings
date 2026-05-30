@@ -120677,6 +120677,40 @@
         }
       }
     },
+    "feed.clear.button": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "クリア"
+          }
+        }
+      }
+    },
+    "feed.clear.tooltip": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear resolved and dismissed messages"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "解決済みおよび却下済みのメッセージをクリア"
+          }
+        }
+      }
+    },
     "settings.account.error.missingRefreshToken": {
       "extractionState": "manual",
       "localizations": {
