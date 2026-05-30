@@ -120830,19 +120830,121 @@
         }
       }
     },
+    "feed.clear.all.confirm.body": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This will remove all %lld items, including %lld pending %@ that still need a response."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保留中の%2$lld件の%3$@を含む、%1$lld件のアイテムをすべて削除します。"
+          }
+        }
+      }
+    },
+    "feed.clear.all.confirm.cancel": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancel"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "キャンセル"
+          }
+        }
+      }
+    },
+    "feed.clear.all.confirm.clear": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear All"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "すべてクリア"
+          }
+        }
+      }
+    },
+    "feed.clear.all.confirm.question.plural": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "questions"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "件の質問"
+          }
+        }
+      }
+    },
+    "feed.clear.all.confirm.question.singular": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "question"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "件の質問"
+          }
+        }
+      }
+    },
+    "feed.clear.all.confirm.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear all feed items?"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "フィードのアイテムをすべてクリアしますか？"
+          }
+        }
+      }
+    },
     "feed.clear.tooltip": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Clear resolved and dismissed messages"
+            "value": "Clear all feed items"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "解決済みおよび却下済みのメッセージをクリア"
+            "value": "フィードのアイテムをすべてクリア"
           }
         }
       }

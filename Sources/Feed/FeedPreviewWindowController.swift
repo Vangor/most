@@ -156,6 +156,7 @@ private enum FeedPreviewActions {
             jump: { ws in print("preview.jump \(ws)") },
             sendText: { ws, text in print("preview.sendText \(ws) \(text)") },
             clearInactionable: { print("preview.clearInactionable") },
+            clearAll: { print("preview.clearAll") },
             dismiss: { id in print("preview.dismiss \(id)") }
         )
     }

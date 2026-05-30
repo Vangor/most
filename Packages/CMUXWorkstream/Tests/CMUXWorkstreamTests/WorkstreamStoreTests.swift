@@ -254,6 +254,36 @@ struct WorkstreamStoreTests {
         #expect(store.items.count == 1)
     }
 
+    // MARK: - clearAll() tests
+
+    @Test("clearAll() empties the store including pending items")
+    func clearAllRemovesPendingItems() {
+        let store = WorkstreamStore(ringCapacity: 10)
+        // Mix of pending and telemetry items.
+        store.ingest(.permission("s1", requestId: "r1"))
+        store.ingest(.permission("s2", requestId: "r2"))
+        store.ingest(WorkstreamEvent(
+            sessionId: "s1",
+            hookEventName: .preToolUse,
+            source: "claude",
+            toolName: "Read"
+        ))
+        #expect(store.items.count == 3)
+        #expect(store.pending.count == 2)
+
+        store.clearAll()
+
+        #expect(store.items.isEmpty)
+        #expect(store.pending.isEmpty)
+    }
+
+    @Test("clearAll() on an empty store is a no-op")
+    func clearAllEmptyStoreNoOp() {
+        let store = WorkstreamStore(ringCapacity: 10)
+        store.clearAll()
+        #expect(store.items.isEmpty)
+    }
+
     // MARK: - expireItems(forWorkstreamId:) + session-end tests
 
     @Test("expireItems(forWorkstreamId:) marks matching pending items expired")

@@ -76,14 +76,9 @@ struct FeedPanelView: View {
     /// Scale multiplier derived from `sidebar-font-size`. Default 1.0 = no change.
     var fontScale: CGFloat = 1.0
 
-    /// True when there are non-pending items the user can clear.
-    private var hasInactionableItems: Bool {
-        viewModel.items.contains { item in
-            switch item.status {
-            case .pending: return false
-            case .resolved, .expired, .telemetry: return true
-            }
-        }
+    /// True when there are any items in the feed (enables the Clear All button).
+    private var hasAnyItems: Bool {
+        !viewModel.items.isEmpty
     }
 
     var body: some View {
@@ -132,9 +127,9 @@ struct FeedPanelView: View {
                 }
             }
             Spacer(minLength: 4)
-            if hasInactionableItems {
+            if hasAnyItems {
                 FeedClearButton(fontScale: fontScale) {
-                    rowActions.clearInactionable()
+                    rowActions.clearAll()
                 }
             }
         }
@@ -218,7 +213,7 @@ private struct FeedClearButton: View {
         }
         .buttonStyle(.plain)
         .onHover { isHovered = $0 }
-        .help(String(localized: "feed.clear.tooltip", defaultValue: "Clear resolved and dismissed messages"))
+        .help(String(localized: "feed.clear.tooltip", defaultValue: "Clear all feed items"))
         .accessibilityIdentifier("FeedClearButton")
     }
 }
@@ -1048,9 +1043,14 @@ struct FeedRowActions {
     /// Claude without switching focus to the terminal.
     let sendText: (String, String) -> Void
     /// Removes all resolved, expired, and telemetry items from the feed.
-    /// Single shared action path — every clear surface (button, future
-    /// keyboard shortcut, context menu) calls this one closure.
+    /// Kept for completeness — no longer bound to the Clear button but
+    /// may be used by other call sites that only want to purge inactionable
+    /// items without touching pending ones.
     let clearInactionable: () -> Void
+    /// Removes ALL feed items unconditionally (including pending). Bound to
+    /// the Clear button. Routes to `FeedCoordinator.clearAllItems()` which
+    /// shows a confirm alert when there are pending actionable items.
+    let clearAll: () -> Void
     /// Removes a single feed item unconditionally regardless of status
     /// (including `.pending`). Per-row dismiss — routes to
     /// `FeedCoordinator.dismissItem(id:)` which delegates to the store's
@@ -1099,6 +1099,11 @@ struct FeedRowActions {
             clearInactionable: {
                 Task { @MainActor in
                     FeedCoordinator.shared.clearInactionableItems()
+                }
+            },
+            clearAll: {
+                Task { @MainActor in
+                    FeedCoordinator.shared.clearAllItems()
                 }
             },
             dismiss: { itemId in
