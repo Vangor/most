@@ -431,7 +431,7 @@ struct RightSidebarPanelView: View {
                 presentation: .find
             )
         case .sessions:
-            SessionIndexView(store: sessionIndexStore, onResume: onResumeSession, onRename: onRenameSession)
+            SessionIndexView(store: sessionIndexStore, onResume: onResumeSession, onRename: onRenameSession, workspaceCwd: sessionIndexDirectory)
                 .onAppear {
                     sessionIndexStore.setCurrentDirectoryIfChanged(sessionIndexDirectory)
                 }
