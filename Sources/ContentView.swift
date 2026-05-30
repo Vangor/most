@@ -9580,7 +9580,7 @@ enum SidebarTabItemFontScale {
     }
 }
 
-private enum SidebarFontSizeProvider {
+enum SidebarFontSizeProvider {
     static func loadFromGhosttyConfig() async -> CGFloat {
         await Task.detached(priority: .utility) {
             GhosttyConfig.load().sidebarFontSize

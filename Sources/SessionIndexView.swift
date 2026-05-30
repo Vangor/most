@@ -60,6 +60,15 @@ struct SessionIndexView: View {
     let onResume: ((SessionEntry) -> Void)?
     /// Rows shown per section before "Show more" is tapped.
     private static let collapsedRowLimit = 5
+    /// Scale multiplier from `sidebar-font-size` Ghostty config key. Loaded
+    /// off the main actor on appear and on config reload. Default 1.0 = no
+    /// change. Passed as a plain CGFloat into snapshot-boundary row structs
+    /// (never read from a store inside row bodies).
+    @State private var fontScale: CGFloat = 1.0
+    /// Incremented on `.ghosttyConfigDidReload` to trigger a `.task(id:)` rerun.
+    @State private var fontScaleRefreshToken: Int = 0
+
+    private func rsScaled(_ base: CGFloat) -> CGFloat { base * fontScale }
 
     static let relativeFormatter: RelativeDateTimeFormatter = {
         let f = RelativeDateTimeFormatter()
@@ -93,6 +102,16 @@ struct SessionIndexView: View {
                 store.reload()
             }
         }
+        .onReceive(
+            NotificationCenter.default.publisher(for: .ghosttyConfigDidReload)
+        ) { _ in
+            fontScaleRefreshToken &+= 1
+        }
+        .task(id: fontScaleRefreshToken) {
+            let size = await SidebarFontSizeProvider.loadFromGhosttyConfig()
+            guard !Task.isCancelled else { return }
+            fontScale = SidebarTabItemFontScale.scale(for: size)
+        }
     }
 
     private var controlBar: some View {
@@ -100,7 +119,8 @@ struct SessionIndexView: View {
             ForEach(SessionGrouping.allCases) { mode in
                 GroupingButton(
                     mode: mode,
-                    isSelected: store.grouping == mode
+                    isSelected: store.grouping == mode,
+                    fontScale: fontScale
                 ) {
                     if store.grouping != mode {
                         store.grouping = mode
@@ -112,7 +132,7 @@ struct SessionIndexView: View {
 
             Toggle(isOn: $store.scopeToCurrentDirectory) {
                 Text(String(localized: "sessionIndex.scope.thisFolder", defaultValue: "This folder only"))
-                    .font(.system(size: 11))
+                    .font(.system(size: rsScaled(11)))
                     .foregroundColor(.secondary)
             }
             .toggleStyle(.checkbox)
@@ -126,7 +146,7 @@ struct SessionIndexView: View {
                 store.reload()
             } label: {
                 Image(systemName: "arrow.clockwise")
-                    .font(.system(size: 10, weight: .medium))
+                    .font(.system(size: rsScaled(10), weight: .medium))
             }
             .buttonStyle(.borderless)
             .help(String(localized: "sessionIndex.reload.tooltip", defaultValue: "Reload Vault"))
@@ -141,7 +161,7 @@ struct SessionIndexView: View {
         VStack(spacing: 6) {
             ProgressView().controlSize(.small)
             Text(String(localized: "sessionIndex.loading", defaultValue: "Loading Vault…"))
-                .font(.system(size: 11))
+                .font(.system(size: rsScaled(11)))
                 .foregroundColor(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -150,11 +170,11 @@ struct SessionIndexView: View {
     private var emptyView: some View {
         VStack(spacing: 4) {
             Text(String(localized: "sessionIndex.empty.title", defaultValue: "Vault is empty"))
-                .font(.system(size: 12))
+                .font(.system(size: rsScaled(12)))
                 .foregroundColor(.secondary)
             Text(String(localized: "sessionIndex.empty.subtitle",
                                    defaultValue: "Claude Code, Codex, OpenCode, and Rovo Dev history will appear here."))
-                .font(.system(size: 11))
+                .font(.system(size: rsScaled(11)))
                 .foregroundColor(.secondary.opacity(0.7))
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 16)
@@ -202,6 +222,7 @@ struct SessionIndexView: View {
                         rowLimit: Self.collapsedRowLimit,
                         isDragged: draggedKey == section.key,
                         previewEntryId: previewEntry?.id,
+                        fontScale: fontScale,
                         isCollapsed: Binding(
                             get: { collapsedSections.contains(section.key) },
                             set: { newValue in
@@ -274,8 +295,11 @@ private struct AgentIconImage: View, Equatable {
 private struct GroupingButton: View {
     let mode: SessionGrouping
     let isSelected: Bool
+    var fontScale: CGFloat = 1.0
     let action: () -> Void
     @State private var isHovered: Bool = false
+
+    private func rsScaled(_ base: CGFloat) -> CGFloat { base * fontScale }
 
     var body: some View {
         Button(action: action) {
@@ -284,14 +308,14 @@ private struct GroupingButton: View {
                     .symbolRenderingMode(.monochrome)
                     .font(
                         .system(
-                            size: RightSidebarChromeControlStyle.secondaryIconSize,
+                            size: rsScaled(RightSidebarChromeControlStyle.secondaryIconSize),
                             weight: RightSidebarChromeControlStyle.iconWeight
                         )
                     )
                 Text(mode.label)
                     .font(
                         .system(
-                            size: RightSidebarChromeControlStyle.labelSize,
+                            size: rsScaled(RightSidebarChromeControlStyle.labelSize),
                             weight: RightSidebarChromeControlStyle.labelWeight
                         )
                     )
@@ -349,12 +373,17 @@ private struct IndexSectionView: View, Equatable {
     /// opacity fade doesn't require observing the drag coordinator here.
     let isDragged: Bool
     let previewEntryId: SessionEntry.ID?
+    /// Plain CGFloat snapshot of the sidebar font scale. Threaded as a value
+    /// (not read from any store) to satisfy the snapshot-boundary rule.
+    var fontScale: CGFloat = 1.0
     @Binding var isCollapsed: Bool
     @Binding var isPopoverOpen: Bool
     /// Value-type action bundle. See `IndexSectionActions`; replaces the
     /// earlier `store` / `dragCoordinator` class references so rows can't
     /// observe the store.
     let actions: IndexSectionActions
+
+    private func rsScaled(_ base: CGFloat) -> CGFloat { base * fontScale }
 
     /// Skip body re-eval when this view's inputs are unchanged. `actions` is
     /// not comparable (closures) but is expected to be stable (closures
@@ -366,6 +395,7 @@ private struct IndexSectionView: View, Equatable {
             && lhs.rowLimit == rhs.rowLimit
             && lhs.isDragged == rhs.isDragged
             && lhs.previewEntryId == rhs.previewEntryId
+            && lhs.fontScale == rhs.fontScale
             && lhs.isCollapsed == rhs.isCollapsed
             && lhs.isPopoverOpen == rhs.isPopoverOpen
     }
@@ -378,6 +408,7 @@ private struct IndexSectionView: View, Equatable {
                     SessionRow(
                         entry: entry,
                         isPreviewPresented: previewEntryId == entry.id,
+                        fontScale: fontScale,
                         onPreviewPresentationChange: { isPresented in
                             if isPresented {
                                 actions.onPreviewEntry(entry)
@@ -404,7 +435,7 @@ private struct IndexSectionView: View, Equatable {
             isPopoverOpen = true
         } label: {
             Text(String(localized: "sessionIndex.section.showMore", defaultValue: "Show more"))
-                .font(.system(size: 12, weight: .medium))
+                .font(.system(size: rsScaled(12), weight: .medium))
                 .foregroundColor(.secondary.opacity(0.7))
                 .padding(.leading, 32)
                 .padding(.trailing, 12)
@@ -431,12 +462,12 @@ private struct IndexSectionView: View, Equatable {
             HStack(spacing: 8) {
                 sectionIconView
                 Text(section.title)
-                    .font(.system(size: 13, weight: .regular))
+                    .font(.system(size: rsScaled(13), weight: .regular))
                     .foregroundColor(.secondary)
                     .lineLimit(1)
                     .truncationMode(.middle)
                 Image(systemName: "chevron.down")
-                    .font(.system(size: 9, weight: .semibold))
+                    .font(.system(size: rsScaled(9), weight: .semibold))
                     .foregroundColor(.secondary.opacity(0.6))
                     .rotationEffect(.degrees(isCollapsed ? -90 : 0))
                 Spacer(minLength: 0)
@@ -455,7 +486,7 @@ private struct IndexSectionView: View, Equatable {
             HStack(spacing: 8) {
                 sectionIconView
                 Text(section.title)
-                    .font(.system(size: 13))
+                    .font(.system(size: rsScaled(13)))
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
@@ -467,12 +498,12 @@ private struct IndexSectionView: View, Equatable {
     private var sectionIconView: some View {
         switch section.icon {
         case .agent(let agent):
-            AgentIconImage(agent: agent, size: 14)
+            AgentIconImage(agent: agent, size: rsScaled(14))
         case .folder:
             Image(systemName: "folder")
-                .font(.system(size: 12, weight: .regular))
+                .font(.system(size: rsScaled(12), weight: .regular))
                 .foregroundColor(.secondary)
-                .frame(width: 14, height: 14)
+                .frame(width: rsScaled(14), height: rsScaled(14))
         }
     }
 }
@@ -553,28 +584,34 @@ private struct SectionGapDropDelegate: DropDelegate {
 private struct SessionRow: View, Equatable {
     let entry: SessionEntry
     let isPreviewPresented: Bool
+    /// Plain CGFloat snapshot of the sidebar font scale. Threaded as a value
+    /// (not read from any store) to satisfy the snapshot-boundary rule.
+    var fontScale: CGFloat = 1.0
     let onPreviewPresentationChange: (Bool) -> Void
     let onResume: ((SessionEntry) -> Void)?
     @State private var isHovered: Bool = false
+
+    private func rsScaled(_ base: CGFloat) -> CGFloat { base * fontScale }
 
     static func == (lhs: SessionRow, rhs: SessionRow) -> Bool {
         // Skip body re-eval during scroll when the entry is unchanged.
         // The closure isn't compared (it comes from stable parent state).
         lhs.entry == rhs.entry &&
-            lhs.isPreviewPresented == rhs.isPreviewPresented
+            lhs.isPreviewPresented == rhs.isPreviewPresented &&
+            lhs.fontScale == rhs.fontScale
     }
 
     var body: some View {
         HStack(spacing: 6) {
-            AgentIconImage(agent: entry.agent, size: 12)
+            AgentIconImage(agent: entry.agent, size: rsScaled(12))
             Text(entry.displayTitle)
-                .font(.system(size: 13))
+                .font(.system(size: rsScaled(13)))
                 .foregroundColor(.primary.opacity(0.92))
                 .lineLimit(1)
                 .truncationMode(.tail)
             Spacer(minLength: 8)
             Text(relativeTime(entry.modified))
-                .font(.system(size: 12).monospacedDigit())
+                .font(.system(size: rsScaled(12)).monospacedDigit())
                 .foregroundColor(.secondary.opacity(0.65))
                 .fixedSize()
         }
@@ -594,9 +631,9 @@ private struct SessionRow: View, Equatable {
             sessionDragItemProvider(for: entry)
         } preview: {
             HStack(spacing: 6) {
-                AgentIconImage(agent: entry.agent, size: 12)
+                AgentIconImage(agent: entry.agent, size: rsScaled(12))
                 Text(entry.displayTitle)
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.system(size: rsScaled(12), weight: .medium))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
@@ -727,6 +764,10 @@ private struct SessionTranscriptPreviewView: View {
 
     @State private var loadState: SessionTranscriptPreviewState = .loading
     @State private var closeIsHovered = false
+    @State private var fontScale: CGFloat = 1.0
+    @State private var fontScaleRefreshToken: Int = 0
+
+    private func rsScaled(_ base: CGFloat) -> CGFloat { base * fontScale }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -747,20 +788,30 @@ private struct SessionTranscriptPreviewView: View {
         .background(
             EscapeKeyCatcher { onDismiss() }
         )
+        .onReceive(
+            NotificationCenter.default.publisher(for: .ghosttyConfigDidReload)
+        ) { _ in
+            fontScaleRefreshToken &+= 1
+        }
+        .task(id: fontScaleRefreshToken) {
+            let size = await SidebarFontSizeProvider.loadFromGhosttyConfig()
+            guard !Task.isCancelled else { return }
+            fontScale = SidebarTabItemFontScale.scale(for: size)
+        }
     }
 
     private var header: some View {
         HStack(spacing: 8) {
-            AgentIconImage(agent: entry.agent, size: 14)
+            AgentIconImage(agent: entry.agent, size: rsScaled(14))
             VStack(alignment: .leading, spacing: 1) {
                 Text(entry.displayTitle)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: rsScaled(13), weight: .semibold))
                     .foregroundColor(.primary)
                     .lineLimit(1)
                     .truncationMode(.middle)
                 if let cwd = entry.cwdLabel {
                     Text(cwd)
-                        .font(.system(size: 11))
+                        .font(.system(size: rsScaled(11)))
                         .foregroundColor(.secondary)
                         .lineLimit(1)
                         .truncationMode(.middle)
@@ -768,7 +819,7 @@ private struct SessionTranscriptPreviewView: View {
             }
             Spacer(minLength: 8)
             Image(systemName: "xmark")
-                .font(.system(size: 11, weight: .semibold))
+                .font(.system(size: rsScaled(11), weight: .semibold))
                 .foregroundColor(closeIsHovered ? .primary : .secondary)
                 .frame(width: 20, height: 20)
                 .background(
@@ -811,7 +862,7 @@ private struct SessionTranscriptPreviewView: View {
                     text: String(localized: "sessionIndex.preview.empty", defaultValue: "No previewable messages")
                 )
             } else {
-                SessionTranscriptVirtualizedList(rows: turns)
+                SessionTranscriptVirtualizedList(rows: turns, fontScale: fontScale)
             }
         }
     }
@@ -821,7 +872,7 @@ private struct SessionTranscriptPreviewView: View {
             ProgressView()
                 .controlSize(.small)
             Text(String(localized: "sessionIndex.popover.loading", defaultValue: "Loading…"))
-                .font(.system(size: 12))
+                .font(.system(size: rsScaled(12)))
                 .foregroundColor(.secondary)
             Spacer(minLength: 0)
         }
@@ -832,10 +883,10 @@ private struct SessionTranscriptPreviewView: View {
     private func statusRow(systemImage: String, text: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: systemImage)
-                .font(.system(size: 12, weight: .medium))
+                .font(.system(size: rsScaled(12), weight: .medium))
                 .foregroundColor(.secondary)
             Text(text)
-                .font(.system(size: 12))
+                .font(.system(size: rsScaled(12)))
                 .foregroundColor(.secondary)
             Spacer(minLength: 0)
         }
@@ -921,12 +972,13 @@ private struct SessionTranscriptResizeHandle: View {
 
 private struct SessionTranscriptVirtualizedList: View, Equatable {
     let rows: [SessionTranscriptDisplayRow]
+    var fontScale: CGFloat = 1.0
 
     var body: some View {
         ScrollView(.vertical) {
             LazyVStack(alignment: .leading, spacing: 0) {
                 ForEach(rows) { row in
-                    SessionTranscriptTurnView(row: row)
+                    SessionTranscriptTurnView(row: row, fontScale: fontScale)
                         .id(row.id)
                 }
             }
@@ -938,12 +990,15 @@ private struct SessionTranscriptVirtualizedList: View, Equatable {
 
 private struct SessionTranscriptTurnView: View, Equatable {
     let row: SessionTranscriptDisplayRow
+    var fontScale: CGFloat = 1.0
+
+    private func rsScaled(_ base: CGFloat) -> CGFloat { base * fontScale }
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
             VStack(spacing: 3) {
                 Text(row.isContinuation ? "" : row.role.label)
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.system(size: rsScaled(10), weight: .semibold))
                     .foregroundColor(row.role.foregroundColor)
                     .lineLimit(1)
                     .frame(width: 58, alignment: .trailing)
@@ -2119,6 +2174,10 @@ private struct SectionPopoverView: View {
 
     @State private var query: String = ""
     @FocusState private var searchFieldFocused: Bool
+    @State private var fontScale: CGFloat = 1.0
+    @State private var fontScaleRefreshToken: Int = 0
+
+    private func rsScaled(_ base: CGFloat) -> CGFloat { base * fontScale }
 
     /// Rows currently rendered in the popover. In snapshot mode this is a
     /// prefix of `fullSnapshot`; in typed-query mode it's the accumulated
@@ -2145,7 +2204,7 @@ private struct SectionPopoverView: View {
             HStack(spacing: 8) {
                 sectionIconView
                 Text(section.title)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: rsScaled(13), weight: .semibold))
                     .foregroundColor(.primary)
                     .lineLimit(1)
                     .truncationMode(.middle)
@@ -2157,7 +2216,7 @@ private struct SectionPopoverView: View {
 
             HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass")
-                    .font(.system(size: 11, weight: .medium))
+                    .font(.system(size: rsScaled(11), weight: .medium))
                     .foregroundColor(.secondary)
                 TextField(
                     String(localized: "sessionIndex.popover.searchPlaceholder",
@@ -2165,14 +2224,14 @@ private struct SectionPopoverView: View {
                     text: $query
                 )
                 .textFieldStyle(.plain)
-                .font(.system(size: 12))
+                .font(.system(size: rsScaled(12)))
                 .focused($searchFieldFocused)
                 if !query.isEmpty {
                     Button {
                         query = ""
                     } label: {
                         Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 11))
+                            .font(.system(size: rsScaled(11)))
                             .foregroundColor(.secondary)
                     }
                     .buttonStyle(.plain)
@@ -2194,10 +2253,10 @@ private struct SectionPopoverView: View {
                     ForEach(errorMessages, id: \.self) { msg in
                         HStack(alignment: .top, spacing: 6) {
                             Image(systemName: "exclamationmark.triangle.fill")
-                                .font(.system(size: 10))
+                                .font(.system(size: rsScaled(10)))
                                 .foregroundColor(.orange)
                             Text(msg)
-                                .font(.system(size: 11))
+                                .font(.system(size: rsScaled(11)))
                                 .foregroundColor(.primary.opacity(0.85))
                         }
                     }
@@ -2214,14 +2273,14 @@ private struct SectionPopoverView: View {
                     } else if loaded.isEmpty {
                         Text(String(localized: "sessionIndex.popover.noMatches",
                                     defaultValue: "No matches"))
-                            .font(.system(size: 12))
+                            .font(.system(size: rsScaled(12)))
                             .foregroundColor(.secondary)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 10)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     } else {
                         ForEach(loaded) { entry in
-                            PopoverRow(entry: entry) {
+                            PopoverRow(entry: entry, fontScale: fontScale) {
                                 onResume?(entry)
                                 onDismiss()
                             }
@@ -2237,7 +2296,7 @@ private struct SectionPopoverView: View {
                         } else {
                             Text(String(localized: "sessionIndex.popover.endOfList",
                                         defaultValue: "You've reached the end"))
-                                .font(.system(size: 11))
+                                .font(.system(size: rsScaled(11)))
                                 .foregroundColor(.secondary.opacity(0.5))
                                 .frame(maxWidth: .infinity, alignment: .center)
                                 .padding(.vertical, 8)
@@ -2349,13 +2408,23 @@ private struct SectionPopoverView: View {
             loadTask = nil
             isLoading = false
         }
+        .onReceive(
+            NotificationCenter.default.publisher(for: .ghosttyConfigDidReload)
+        ) { _ in
+            fontScaleRefreshToken &+= 1
+        }
+        .task(id: fontScaleRefreshToken) {
+            let size = await SidebarFontSizeProvider.loadFromGhosttyConfig()
+            guard !Task.isCancelled else { return }
+            fontScale = SidebarTabItemFontScale.scale(for: size)
+        }
     }
 
     private var loadingRow: some View {
         HStack(spacing: 6) {
             ProgressView().controlSize(.small)
             Text(String(localized: "sessionIndex.popover.loading", defaultValue: "Loading…"))
-                .font(.system(size: 11))
+                .font(.system(size: rsScaled(11)))
                 .foregroundColor(.secondary)
             Spacer(minLength: 0)
         }
@@ -2438,24 +2507,28 @@ private struct SectionPopoverView: View {
     private var sectionIconView: some View {
         switch section.icon {
         case .agent(let agent):
-            AgentIconImage(agent: agent, size: 14)
+            AgentIconImage(agent: agent, size: rsScaled(14))
         case .folder:
             Image(systemName: "folder")
-                .font(.system(size: 12, weight: .regular))
+                .font(.system(size: rsScaled(12), weight: .regular))
                 .foregroundColor(.secondary)
-                .frame(width: 14, height: 14)
+                .frame(width: rsScaled(14), height: rsScaled(14))
         }
     }
 }
 
 private struct PopoverRow: View, Equatable {
     let entry: SessionEntry
+    var fontScale: CGFloat = 1.0
     let onActivate: () -> Void
 
     @State private var isHovered: Bool = false
 
+    private func rsScaled(_ base: CGFloat) -> CGFloat { base * fontScale }
+
     static func == (lhs: PopoverRow, rhs: PopoverRow) -> Bool {
-        lhs.entry == rhs.entry
+        lhs.entry == rhs.entry &&
+            lhs.fontScale == rhs.fontScale
     }
 
     fileprivate static func flatten(_ s: String) -> String {
@@ -2479,20 +2552,20 @@ private struct PopoverRow: View, Equatable {
         TimelineView(RelativeTimestampSchedule(modified: entry.modified)) { context in
             Text(SessionIndexView.relativeFormatter.localizedString(for: entry.modified, relativeTo: context.date))
         }
-        .font(.system(size: 11).monospacedDigit())
+        .font(.system(size: rsScaled(11)).monospacedDigit())
         .foregroundColor(.secondary.opacity(0.7))
         .fixedSize()
     }
 
     var body: some View {
         HStack(spacing: 6) {
-            AgentIconImage(agent: entry.agent, size: 12)
+            AgentIconImage(agent: entry.agent, size: rsScaled(12))
             // Flatten newlines so titles containing `<command-message>…\n…`
             // envelopes stay single-line; SwiftUI's `lineLimit(1)` doesn't
             // always constrain a Text that has hard line breaks in the
             // source string.
             Text(Self.flatten(entry.displayTitle))
-                .font(.system(size: 12))
+                .font(.system(size: rsScaled(12)))
                 .foregroundColor(.primary.opacity(0.92))
                 .lineLimit(1)
                 .truncationMode(.tail)
