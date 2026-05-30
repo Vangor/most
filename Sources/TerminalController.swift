@@ -10363,42 +10363,17 @@ class TerminalController {
             }
             try? stdinPipe.fileHandleForWriting.close()
 
-            // Drain output asynchronously so the subprocess can't stall on a
-            // full pipe buffer while we wait for it. Append both streams to
-            // /tmp/cmux-claude-hook-relay.log so we can diagnose pill
-            // disappearance and other late-arriving misbehavior without
-            // reaching for Sentry / cloud telemetry.
-            let logURL = URL(fileURLWithPath: "/tmp/cmux-claude-hook-relay.log")
+            // Drain both streams to EOF so the subprocess can't stall on a full
+            // pipe buffer while we wait for it. The output is intentionally
+            // discarded — the hook applies its effects via socket RPCs, not via
+            // stdout — so there is nothing to capture here.
             DispatchQueue.global(qos: .utility).async {
-                let data = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
-                if !data.isEmpty {
-                    let header = "[\(Date()) STDOUT argv=\(argv.joined(separator: " "))]\n".data(using: .utf8) ?? Data()
-                    if let fh = try? FileHandle(forWritingTo: logURL) {
-                        fh.seekToEndOfFile(); fh.write(header); fh.write(data); fh.write("\n".data(using: .utf8) ?? Data()); try? fh.close()
-                    } else {
-                        try? (header + data + Data("\n".utf8)).write(to: logURL)
-                    }
-                }
+                _ = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
             }
             DispatchQueue.global(qos: .utility).async {
-                let data = stderrPipe.fileHandleForReading.readDataToEndOfFile()
-                if !data.isEmpty {
-                    let header = "[\(Date()) STDERR argv=\(argv.joined(separator: " "))]\n".data(using: .utf8) ?? Data()
-                    if let fh = try? FileHandle(forWritingTo: logURL) {
-                        fh.seekToEndOfFile(); fh.write(header); fh.write(data); fh.write("\n".data(using: .utf8) ?? Data()); try? fh.close()
-                    } else {
-                        try? (header + data + Data("\n".utf8)).write(to: logURL)
-                    }
-                }
+                _ = stderrPipe.fileHandleForReading.readDataToEndOfFile()
             }
             process.waitUntilExit()
-            // Always log the exit code so we can see hooks even with empty output.
-            let exitLine = "[\(Date()) EXIT rc=\(process.terminationStatus) argv=\(argv.joined(separator: " "))]\n"
-            if let fh = try? FileHandle(forWritingTo: logURL) {
-                fh.seekToEndOfFile(); fh.write(exitLine.data(using: .utf8) ?? Data()); try? fh.close()
-            } else {
-                try? exitLine.data(using: .utf8)?.write(to: logURL)
-            }
         }
 
         return .ok([
