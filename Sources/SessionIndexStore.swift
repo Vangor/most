@@ -242,6 +242,28 @@ final class SessionIndexStore: ObservableObject {
         currentDirectory = next
     }
 
+    /// The active workspace's cwd, used as the reference directory for
+    /// categorization (Main / Worktrees / Other) regardless of whether the
+    /// `scopeToCurrentDirectory` toggle is on.
+    ///
+    /// This is intentionally separate from `currentDirectory`, which gates
+    /// *scope filtering* of the entry list. Categorization (showing headers)
+    /// and scope filtering (showing only entries under the current dir) are
+    /// independent concerns: the headers should appear whenever an active
+    /// workspace folder can be determined — not only when the user has opted
+    /// in to the scope filter.
+    @Published var categorizationDirectory: String? = nil {
+        didSet {
+            guard categorizationDirectory != oldValue else { return }
+            invalidateSectionsCache()
+        }
+    }
+
+    func setCategorizationDirectoryIfChanged(_ next: String?) {
+        guard categorizationDirectory != next else { return }
+        categorizationDirectory = next
+    }
+
     @Published var grouping: SessionGrouping {
         didSet {
             guard grouping != oldValue else { return }
@@ -356,11 +378,15 @@ final class SessionIndexStore: ObservableObject {
     ///   component).
     /// - `.other`: cwd belongs to a completely different directory tree.
     ///
-    /// When `currentDirectory` is nil the function returns a single `.main` category
-    /// containing all sections (identical to the flat `sectionsForCurrentGrouping()` output).
-    /// Categories with no entries are omitted entirely.
+    /// When both `categorizationDirectory` and `currentDirectory` are nil, the function
+    /// returns a single `.main` category containing all sections (identical to the flat
+    /// `sectionsForCurrentGrouping()` output). Categories with no entries are omitted entirely.
     func categorizedSectionsForCurrentGrouping() -> [CategorizedVaultSections] {
-        guard let dir = normalizedDirectory(currentDirectory) else {
+        // Use the active workspace cwd for categorization if available; fall back to
+        // the scope-filter directory. This decouples header visibility from the
+        // `scopeToCurrentDirectory` toggle — categorization (Main/Worktrees/Other) works
+        // whenever there is a workspace folder, regardless of whether scope filtering is on.
+        guard let dir = normalizedDirectory(categorizationDirectory ?? currentDirectory) else {
             let sections = sectionsForCurrentGrouping()
             return sections.isEmpty ? [] : [CategorizedVaultSections(category: .main, sections: sections)]
         }

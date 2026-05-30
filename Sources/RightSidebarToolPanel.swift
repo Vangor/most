@@ -263,7 +263,8 @@ struct RightSidebarToolPanelView: View {
                 store: panel.sessionIndexStore,
                 onResume: { entry in
                     SessionEntryResumeCoordinator.resume(entry, tabManager: tabManager)
-                }
+                },
+                workspaceCwd: tabManager.selectedWorkspace?.currentDirectory
             )
             .background(
                 RightSidebarToolFocusAnchor(onViewChange: panel.attachSessionIndexFocusAnchor)

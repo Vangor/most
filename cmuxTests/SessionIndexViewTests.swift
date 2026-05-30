@@ -277,6 +277,82 @@ final class SessionIndexViewTests: XCTestCase {
         }
     }
 
+    // MARK: - categorizationDirectory — toggle-independent header visibility (BUG regression)
+
+    /// Regression: category headers (Main / Worktrees / Other) never appeared with the
+    /// `scopeToCurrentDirectory` toggle OFF because `categorizedSectionsForCurrentGrouping()`
+    /// used only `currentDirectory`, which is nil when no scope filter is active.
+    ///
+    /// Fix: the store now exposes `categorizationDirectory` (set from the active workspace
+    /// cwd by the view layer) as a primary source for the reference folder. Categorization
+    /// uses `categorizationDirectory ?? currentDirectory`, so headers appear whenever the
+    /// active workspace provides a folder — independent of the scope toggle.
+    func testCategoryHeadersAppearWithToggleOffWhenWorkspaceCwdProvided() {
+        preservingSessionIndexDefaults {
+            let store = SessionIndexStore()
+            // Toggle is OFF (the default). `currentDirectory` is NOT set —
+            // simulating the typical state when the user hasn't scoped the list.
+            XCTAssertFalse(store.scopeToCurrentDirectory)
+            XCTAssertNil(store.currentDirectory)
+
+            // Workspace cwd is provided via `categorizationDirectory` (wired from
+            // the active workspace's currentDirectory by SessionIndexView).
+            store.setCategorizationDirectoryIfChanged("/Users/vangor/Git/cmux")
+
+            let mainEntry = makeEntry(title: "main branch", cwd: "/Users/vangor/Git/cmux")
+            let worktreeEntry = makeEntry(
+                title: "feature worktree",
+                cwd: "/Users/vangor/Git/cmux/.worktrees/feature-branch"
+            )
+            store.replaceEntriesForTesting([mainEntry, worktreeEntry])
+
+            let categorized = store.categorizedSectionsForCurrentGrouping()
+            // 2+ categories → showCategoryHeaders would be true in SessionIndexView.
+            XCTAssertGreaterThan(
+                categorized.count, 1,
+                "Expected multiple category groups when workspaceCwd is set and entries span 2+ categories, got: \(categorized.map(\.category))"
+            )
+            XCTAssertTrue(
+                categorized.map(\.category).contains(.main),
+                "Expected .main category. Got: \(categorized.map(\.category))"
+            )
+            XCTAssertTrue(
+                categorized.map(\.category).contains(.worktrees),
+                "Expected .worktrees category. Got: \(categorized.map(\.category))"
+            )
+        }
+    }
+
+    /// Verify that the scope toggle's own behavior is unchanged: `currentDirectory`
+    /// still drives list filtering when `scopeToCurrentDirectory` is ON, and
+    /// `categorizationDirectory` serves categorization independently.
+    func testCategorizationDirectoryDoesNotAffectScopeFiltering() {
+        preservingSessionIndexDefaults {
+            let store = SessionIndexStore()
+            // Scope toggle ON, filtering by /Users/vangor/Git/cmux.
+            store.scopeToCurrentDirectory = true
+            store.currentDirectory = "/Users/vangor/Git/cmux"
+            // Categorization dir is a broader parent scope — should not leak into filtering.
+            store.setCategorizationDirectoryIfChanged("/Users/vangor/Git")
+
+            let inScopeEntry = makeEntry(title: "in scope", cwd: "/Users/vangor/Git/cmux")
+            let outOfScopeEntry = makeEntry(title: "out of scope", cwd: "/Users/vangor/Git/other-repo")
+            store.replaceEntriesForTesting([inScopeEntry, outOfScopeEntry])
+
+            // sectionsForCurrentGrouping() (scope filtered) should only show the in-scope entry.
+            let sections = store.sectionsForCurrentGrouping()
+            let allEntries = sections.flatMap(\.entries)
+            XCTAssertTrue(
+                allEntries.map(\.title).contains("in scope"),
+                "In-scope entry should be visible."
+            )
+            XCTAssertFalse(
+                allEntries.map(\.title).contains("out of scope"),
+                "Out-of-scope entry should be hidden by the scope filter."
+            )
+        }
+    }
+
     func testAgentOrderBackfillUsesLatestModifiedForDuplicateAgents() {
         preservingSessionIndexDefaults {
             let store = SessionIndexStore()

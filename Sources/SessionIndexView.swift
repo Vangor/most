@@ -58,6 +58,13 @@ struct SessionIndexView: View {
     @State private var openPopoverSection: SectionKey?
     @State private var previewEntry: SessionEntry?
     let onResume: ((SessionEntry) -> Void)?
+    /// The active workspace's current directory, used to drive
+    /// `store.categorizationDirectory` so the Main/Worktrees/Other headers
+    /// appear even when `scopeToCurrentDirectory` is off.
+    /// Passed as a plain `String?` value (not observed) so this view doesn't
+    /// subscribe to `TabManager` directly — the caller reads it from the
+    /// environment and re-renders this view when it changes.
+    var workspaceCwd: String? = nil
     /// Rows shown per section before "Show more" is tapped.
     private static let collapsedRowLimit = 5
     /// Scale multiplier from `sidebar-font-size` Ghostty config key. Loaded
@@ -101,6 +108,15 @@ struct SessionIndexView: View {
             if store.entries.isEmpty && !store.isLoading {
                 store.reload()
             }
+            // Seed the categorization directory on first appearance so headers
+            // render correctly before the first `workspaceCwd` change fires.
+            store.setCategorizationDirectoryIfChanged(workspaceCwd)
+        }
+        .onChange(of: workspaceCwd) { _, newCwd in
+            // Keep the store's categorization directory in sync with the
+            // active workspace's folder. This runs OUTSIDE the body
+            // computation path to satisfy the no-state-mutation-in-body rule.
+            store.setCategorizationDirectoryIfChanged(newCwd)
         }
         .onReceive(
             NotificationCenter.default.publisher(for: .ghosttyConfigDidReload)
