@@ -165,6 +165,37 @@ enum SectionIcon: Equatable {
     case folder
 }
 
+/// Categorizes a vault entry's relationship to the current working directory.
+/// Used to split the sidebar into "Main", "Worktrees", and optionally "Other".
+enum VaultScopeCategory: Hashable, Sendable {
+    /// Entry is in the current directory (or a subdirectory) but NOT under a .worktrees/ path.
+    case main
+    /// Entry is under a .worktrees/ component within the current directory tree.
+    case worktrees
+    /// Entry belongs to a different directory tree entirely.
+    case other
+}
+
+/// A group of sections belonging to one `VaultScopeCategory`. Produced by
+/// `SessionIndexStore.categorizedSectionsForCurrentGrouping()`.
+struct CategorizedVaultSections: Identifiable, Equatable {
+    let category: VaultScopeCategory
+    let sections: [IndexSection]
+
+    var id: VaultScopeCategory { category }
+
+    var categoryTitle: String {
+        switch category {
+        case .main:
+            return String(localized: "sessionIndex.category.main", defaultValue: "Main")
+        case .worktrees:
+            return String(localized: "sessionIndex.category.worktrees", defaultValue: "Worktrees")
+        case .other:
+            return String(localized: "sessionIndex.category.other", defaultValue: "Other")
+        }
+    }
+}
+
 /// Owns the "which section is currently being dragged" bit, separate from
 /// `SessionIndexStore`. Isolating this means drag start/end does not emit
 /// `objectWillChange` on the data store, so rows and gaps don't re-render
@@ -310,6 +341,109 @@ final class SessionIndexStore: ObservableObject {
         cachedSections = sections
         cachedSectionsRevision = sectionsCacheRevision
         return sections
+    }
+
+    /// Returns sections split into `[CategorizedVaultSections]` when a current directory
+    /// is known. Each category groups the entries whose cwd relationship to `currentDirectory`
+    /// matches the category's rule:
+    ///
+    /// - `.main`: cwd is `currentDirectory` or a subdirectory NOT under `.worktrees/`.
+    /// - `.worktrees`: cwd is under `currentDirectory/.worktrees/` (or any `.worktrees/` dir inside).
+    /// - `.other`: cwd belongs to a completely different directory tree.
+    ///
+    /// When `currentDirectory` is nil the function returns a single `.main` category
+    /// containing all sections (identical to the flat `sectionsForCurrentGrouping()` output).
+    /// Categories with no entries are omitted entirely.
+    func categorizedSectionsForCurrentGrouping() -> [CategorizedVaultSections] {
+        guard let dir = normalizedDirectory(currentDirectory) else {
+            let sections = sectionsForCurrentGrouping()
+            return sections.isEmpty ? [] : [CategorizedVaultSections(category: .main, sections: sections)]
+        }
+
+        let worktreesPrefix = dir + "/.worktrees/"
+        let dirPrefix = dir + "/"
+
+        func category(for entry: SessionEntry) -> VaultScopeCategory {
+            guard let cwd = normalizedDirectory(entry.cwd) else { return .other }
+            // Exact match to the current directory itself counts as Main.
+            if cwd == dir { return .main }
+            if cwd.hasPrefix(worktreesPrefix) || cwd == (dir + "/.worktrees") { return .worktrees }
+            if cwd.hasPrefix(dirPrefix) { return .main }
+            return .other
+        }
+
+        // Partition ALL (unscoped) entries into three buckets.
+        var mainEntries: [SessionEntry] = []
+        var worktreeEntries: [SessionEntry] = []
+        var otherEntries: [SessionEntry] = []
+        for entry in entries {
+            switch category(for: entry) {
+            case .main: mainEntries.append(entry)
+            case .worktrees: worktreeEntries.append(entry)
+            case .other: otherEntries.append(entry)
+            }
+        }
+
+        func makeSections(from bucket: [SessionEntry]) -> [IndexSection] {
+            guard !bucket.isEmpty else { return [] }
+            switch grouping {
+            case .agent:
+                let buckets = Dictionary(grouping: bucket, by: { $0.agent.rawValue })
+                return agentOrder.compactMap { agent in
+                    guard let bucketEntries = buckets[agent.rawValue], !bucketEntries.isEmpty else { return nil }
+                    return IndexSection(
+                        key: .agent(agent),
+                        title: agent.displayName,
+                        icon: .agent(agent),
+                        entries: bucketEntries
+                    )
+                }
+            case .directory:
+                let buckets = Dictionary(grouping: bucket) { $0.cwd ?? "" }
+                let knownPaths = Set(directoryOrder)
+                let unknownSorted = buckets.keys
+                    .filter { !knownPaths.contains($0) }
+                    .sorted { lhs, rhs in
+                        let lMax = buckets[lhs]?.map(\.modified).max() ?? .distantPast
+                        let rMax = buckets[rhs]?.map(\.modified).max() ?? .distantPast
+                        return lMax > rMax
+                    }
+                return (directoryOrder + unknownSorted)
+                    .filter { buckets[$0] != nil }
+                    .map { path in
+                        IndexSection(
+                            key: .directory(path.isEmpty ? nil : path),
+                            title: directoryDisplayName(path),
+                            icon: .folder,
+                            entries: buckets[path] ?? []
+                        )
+                    }
+            }
+        }
+
+        let mainSections = makeSections(from: mainEntries)
+        let worktreeSections = makeSections(from: worktreeEntries)
+        let otherSections = makeSections(from: otherEntries)
+
+        var result: [CategorizedVaultSections] = []
+        if !mainSections.isEmpty {
+            result.append(CategorizedVaultSections(category: .main, sections: mainSections))
+        }
+        if !worktreeSections.isEmpty {
+            result.append(CategorizedVaultSections(category: .worktrees, sections: worktreeSections))
+        }
+        if !otherSections.isEmpty {
+            result.append(CategorizedVaultSections(category: .other, sections: otherSections))
+        }
+        // Fall back to a single Main group if directory is set but all entries are "other"
+        // (prevents a completely empty sidebar when only non-worktree other entries exist).
+        if result.isEmpty {
+            let all = sectionsForCurrentGrouping()
+            if !all.isEmpty {
+                result.append(CategorizedVaultSections(category: .main, sections: all))
+            }
+        }
+        return result
     }
 
     /// Extend `directoryOrder` with any cwds seen in `entries` that aren't

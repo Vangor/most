@@ -188,7 +188,10 @@ struct SessionIndexView: View {
     }
 
     private var sessionsList: some View {
-        let sections = store.sectionsForCurrentGrouping()
+        let categorized = store.categorizedSectionsForCurrentGrouping()
+        // Show category headers only when more than one non-empty category is present.
+        let showCategoryHeaders = categorized.count > 1
+
         // Read draggedKey once per body eval so every child gets a snapshot
         // of the same value. Children are Equatable value views, so a
         // draggedKey transition only re-renders the two sections whose
@@ -215,51 +218,59 @@ struct SessionIndexView: View {
 
         return ScrollView(.vertical) {
             LazyVStack(alignment: .leading, spacing: 0) {
-                ForEach(Array(sections.enumerated()), id: \.element.key) { index, section in
-                    // Drop above this row -> insert dragged section BEFORE this section's key.
-                    SectionReorderGap(
-                        beforeKey: section.key,
-                        isValidDrop: draggedKey == nil || draggedKey != section.key,
-                        actions: gapActions
-                    ).equatable()
-                    IndexSectionView(
-                        section: section,
-                        rowLimit: Self.collapsedRowLimit,
-                        isDragged: draggedKey == section.key,
-                        previewEntryId: previewEntry?.id,
-                        fontScale: fontScale,
-                        isCollapsed: Binding(
-                            get: { collapsedSections.contains(section.key) },
-                            set: { newValue in
-                                if newValue {
-                                    collapsedSections.insert(section.key)
-                                } else {
-                                    collapsedSections.remove(section.key)
-                                }
-                            }
-                        ),
-                        isPopoverOpen: Binding(
-                            get: { openPopoverSection == section.key },
-                            set: { newValue in
-                                openPopoverSection = newValue ? section.key : nil
-                            }
-                        ),
-                        actions: IndexSectionActions(
-                            onBeginDrag: { dragCoordinator.draggedKey = section.key },
-                            onPreviewEntry: { entry in
-                                previewEntry = entry
-                            },
-                            onDismissPreview: { id in
-                                if previewEntry?.id == id {
-                                    previewEntry = nil
-                                }
-                            },
-                            onResume: onResumeClosure,
-                            search: searchFn,
-                            loadSnapshot: loadSnapshotFn
+                ForEach(categorized) { categoryGroup in
+                    if showCategoryHeaders {
+                        VaultCategoryHeaderView(
+                            title: categoryGroup.categoryTitle,
+                            fontScale: fontScale
                         )
-                    ).equatable()
-                    let _ = index
+                    }
+                    ForEach(Array(categoryGroup.sections.enumerated()), id: \.element.key) { index, section in
+                        // Drop above this row -> insert dragged section BEFORE this section's key.
+                        SectionReorderGap(
+                            beforeKey: section.key,
+                            isValidDrop: draggedKey == nil || draggedKey != section.key,
+                            actions: gapActions
+                        ).equatable()
+                        IndexSectionView(
+                            section: section,
+                            rowLimit: Self.collapsedRowLimit,
+                            isDragged: draggedKey == section.key,
+                            previewEntryId: previewEntry?.id,
+                            fontScale: fontScale,
+                            isCollapsed: Binding(
+                                get: { collapsedSections.contains(section.key) },
+                                set: { newValue in
+                                    if newValue {
+                                        collapsedSections.insert(section.key)
+                                    } else {
+                                        collapsedSections.remove(section.key)
+                                    }
+                                }
+                            ),
+                            isPopoverOpen: Binding(
+                                get: { openPopoverSection == section.key },
+                                set: { newValue in
+                                    openPopoverSection = newValue ? section.key : nil
+                                }
+                            ),
+                            actions: IndexSectionActions(
+                                onBeginDrag: { dragCoordinator.draggedKey = section.key },
+                                onPreviewEntry: { entry in
+                                    previewEntry = entry
+                                },
+                                onDismissPreview: { id in
+                                    if previewEntry?.id == id {
+                                        previewEntry = nil
+                                    }
+                                },
+                                onResume: onResumeClosure,
+                                search: searchFn,
+                                loadSnapshot: loadSnapshotFn
+                            )
+                        ).equatable()
+                        let _ = index
+                    }
                 }
                 // Trailing gap -> append.
                 SectionReorderGap(
@@ -274,6 +285,27 @@ struct SessionIndexView: View {
         .background(
             DragCancelMonitor(dragCoordinator: dragCoordinator)
         )
+    }
+}
+
+/// A lightweight header row that separates vault scope categories (Main / Worktrees / Other)
+/// when the sidebar has entries in more than one category.
+private struct VaultCategoryHeaderView: View {
+    let title: String
+    var fontScale: CGFloat = 1.0
+
+    private func rsScaled(_ base: CGFloat) -> CGFloat { base * fontScale }
+
+    var body: some View {
+        Text(title)
+            .font(.system(size: rsScaled(10), weight: .semibold))
+            .foregroundColor(.secondary.opacity(0.55))
+            .textCase(.uppercase)
+            .tracking(0.5)
+            .padding(.horizontal, 12)
+            .padding(.top, 10)
+            .padding(.bottom, 2)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
