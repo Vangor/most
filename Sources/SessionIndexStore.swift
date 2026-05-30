@@ -460,33 +460,12 @@ final class SessionIndexStore: ObservableObject {
             return sections.isEmpty ? [] : [CategorizedVaultSections(category: .main, sections: sections)]
         }
 
-        let worktreesPrefix = dir + "/.worktrees/"
-        let dirPrefix = dir + "/"
-
-        func category(for entry: SessionEntry) -> VaultScopeCategory {
-            guard let cwd = normalizedDirectory(entry.cwd) else { return .other }
-            // Exact match to the current directory itself counts as Main.
-            if cwd == dir { return .main }
-            // Direct .worktrees child of dir (original top-level case).
-            if cwd.hasPrefix(worktreesPrefix) || cwd == (dir + "/.worktrees") { return .worktrees }
-            if cwd.hasPrefix(dirPrefix) {
-                // Any path inside the subtree that contains a /.worktrees/ component
-                // (e.g. <parent>/<repo>/.worktrees/<wt>) is classified as Worktrees.
-                // The slash delimiters prevent false matches on names like "foo.worktreesbar".
-                if cwd.range(of: "/.worktrees/") != nil || cwd.hasSuffix("/.worktrees") {
-                    return .worktrees
-                }
-                return .main
-            }
-            return .other
-        }
-
         // Partition ALL (unscoped) entries into three buckets.
         var mainEntries: [SessionEntry] = []
         var worktreeEntries: [SessionEntry] = []
         var otherEntries: [SessionEntry] = []
         for entry in entries {
-            switch category(for: entry) {
+            switch Self.scopeCategory(forCwd: entry.cwd, relativeTo: dir) {
             case .main: mainEntries.append(entry)
             case .worktrees: worktreeEntries.append(entry)
             case .other: otherEntries.append(entry)
@@ -888,12 +867,53 @@ final class SessionIndexStore: ObservableObject {
     }
 
     private func normalizedDirectory(_ value: String?) -> String? {
+        Self.normalizedDirectoryPath(value)
+    }
+
+    /// Static, pure normalization so categorization logic can be unit-tested
+    /// without instantiating a `@MainActor` store.
+    static func normalizedDirectoryPath(_ value: String?) -> String? {
         guard let value, !value.isEmpty else { return nil }
         var path = (value as NSString).standardizingPath
         if path.count > 1 && path.hasSuffix("/") {
             path.removeLast()
         }
         return path
+    }
+
+    /// Directory markers that identify a git worktree checkout. BOTH conventions
+    /// are in active use across the user's repos and must be recognized:
+    ///   - `/.worktrees/`        — the ops-layer `/si` skill convention.
+    ///   - `/.claude/worktrees/` — Claude Code's agent worktrees, used by cmux
+    ///     itself (e.g. `~/Git/cmux/.claude/worktrees/agent-…`).
+    /// Matching only the first marker (the original bug) left every cmux worktree
+    /// session classified as `.main`, so the "Worktrees" header never appeared.
+    static let worktreeMarkers = ["/.claude/worktrees/", "/.worktrees/"]
+
+    /// Returns true if `path` sits inside (or exactly is) a recognized worktree
+    /// container. Slash delimiters prevent false matches on names like
+    /// `foo.worktreesbar`.
+    static func isWorktreePath(_ path: String) -> Bool {
+        for marker in worktreeMarkers {
+            if path.range(of: marker) != nil { return true }
+            // `<repo>/.worktrees` or `<repo>/.claude/worktrees` with no trailing leaf.
+            if path.hasSuffix(String(marker.dropLast())) { return true }
+        }
+        return false
+    }
+
+    /// Classifies `rawCwd` relative to reference directory `rawDir` into
+    /// Main / Worktrees / Other. Pure + static so it is directly unit-testable.
+    static func scopeCategory(forCwd rawCwd: String?, relativeTo rawDir: String) -> VaultScopeCategory {
+        guard let dir = normalizedDirectoryPath(rawDir),
+              let cwd = normalizedDirectoryPath(rawCwd) else { return .other }
+        if cwd == dir { return .main }
+        // Inside the reference subtree: Worktrees if it carries a worktree marker,
+        // otherwise Main. Outside the subtree: Other.
+        if cwd.hasPrefix(dir + "/") {
+            return isWorktreePath(cwd) ? .worktrees : .main
+        }
+        return .other
     }
 
     // MARK: - Scanning
