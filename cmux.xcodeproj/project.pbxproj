@@ -243,6 +243,7 @@
 		F1A0C0DE0000000000000002 /* FindTextFieldSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A0C0DE0000000000000001 /* FindTextFieldSupport.swift */; };
 		F0C05170000000000000002 /* FocusHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0C05170000000000000001 /* FocusHistory.swift */; };
 		C4160A020000000000000001 /* FocusHistoryMenuInvalidator.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4160A020000000000000002 /* FocusHistoryMenuInvalidator.swift */; };
+		0D35B9BFB47242DFAF346E78 /* ForkBundleIdentifierClassificationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEFF61C95F8640FFA90096C3 /* ForkBundleIdentifierClassificationTests.swift */; };
 		D0B10012A1B2C3D4E5F60001 /* GhosttyApp+SurfaceConfigurationReload.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0B10013A1B2C3D4E5F60001 /* GhosttyApp+SurfaceConfigurationReload.swift */; };
 		1718C0DE1718C0DE17180002 /* GhosttyCommandShiftForwardingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1718C0DE1718C0DE17180001 /* GhosttyCommandShiftForwardingTests.swift */; };
 		A5001004 /* GhosttyConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5001014 /* GhosttyConfig.swift */; };
@@ -828,6 +829,7 @@
 		F1A0C0DE0000000000000001 /* FindTextFieldSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Find/FindTextFieldSupport.swift; sourceTree = "<group>"; };
 		F0C05170000000000000001 /* FocusHistory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusHistory.swift; sourceTree = "<group>"; };
 		C4160A020000000000000002 /* FocusHistoryMenuInvalidator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusHistoryMenuInvalidator.swift; sourceTree = "<group>"; };
+		FEFF61C95F8640FFA90096C3 /* ForkBundleIdentifierClassificationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForkBundleIdentifierClassificationTests.swift; sourceTree = "<group>"; };
 		A5001017 /* ghostty.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ghostty.h; sourceTree = "<group>"; };
 		D0B10013A1B2C3D4E5F60001 /* GhosttyApp+SurfaceConfigurationReload.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GhosttyApp+SurfaceConfigurationReload.swift"; sourceTree = "<group>"; };
 		1718C0DE1718C0DE17180001 /* GhosttyCommandShiftForwardingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhosttyCommandShiftForwardingTests.swift; sourceTree = "<group>"; };
@@ -1671,6 +1673,7 @@
 					D0B1000FA1B2C3D4E5F60001 /* BrowserPaneDropRoutingTests.swift */,
 					02FC74F2C27127CC565B3E8C /* TerminalAndGhosttyTests.swift */,
 					C35610000000000000000002 /* FinderFileDropRegressionTests.swift */,
+					FEFF61C95F8640FFA90096C3 /* ForkBundleIdentifierClassificationTests.swift */,
 					C44550000000000000000002 /* PanelOwnedNativeViewSessionTests.swift */,
 					3069F1D10000000000000004 /* GhosttyPasteboardFidelityTests.swift */,
 					D7AB34400000000000000004 /* GhosttyTerminalViewVisibilityPolicyTests.swift */,
@@ -2483,6 +2486,7 @@
 				C0DE31390000000000000103 /* FilePreviewReviewFeedbackTests.swift in Sources */,
 				FE002103 /* FileSearchRipgrepParserTests.swift in Sources */,
 				C35610000000000000000001 /* FinderFileDropRegressionTests.swift in Sources */,
+				0D35B9BFB47242DFAF346E78 /* ForkBundleIdentifierClassificationTests.swift in Sources */,
 				1718C0DE1718C0DE17180002 /* GhosttyCommandShiftForwardingTests.swift in Sources */,
 				A11EB0000000000000000000 /* GhosttyConfigPathResolverTests.swift in Sources */,
 				F4000000A1B2C3D4E5F60718 /* GhosttyConfigTests.swift in Sources */,
