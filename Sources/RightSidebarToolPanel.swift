@@ -209,6 +209,28 @@ final class RightSidebarToolPanel: Panel, ObservableObject {
         let directory = workspace.currentDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
         store.setCurrentDirectoryIfChanged(directory.isEmpty ? nil : directory)
     }
+
+    /// Rename handler used by the sidebar-tool (pane) variant of the session index.
+    /// Routes through `promptRenameOpenSession` for open sessions; falls back to
+    /// a standalone NSAlert + session-names store for closed/historical ones.
+    func renameSessionEntry(
+        _ entry: SessionEntry,
+        tabManager: TabManager,
+        sessionIndexStore: SessionIndexStore
+    ) {
+        for workspace in tabManager.tabs {
+            if workspace.restoredAgentSnapshotsByPanelId.values.contains(where: { $0.sessionId == entry.sessionId }) {
+                workspace.promptRenameOpenSession(bySessionId: entry.sessionId) { newName in
+                    sessionIndexStore.setCustomName(newName, forSessionId: entry.sessionId)
+                }
+                return
+            }
+        }
+        // Session is not currently open — standalone alert.
+        let currentName = entry.customName ?? entry.displayTitle
+        guard let newName = Workspace.runRenameAlert(currentName: currentName) else { return }
+        sessionIndexStore.setCustomName(newName, forSessionId: entry.sessionId)
+    }
 }
 
 struct RightSidebarToolPanelView: View {
@@ -263,6 +285,9 @@ struct RightSidebarToolPanelView: View {
                 store: panel.sessionIndexStore,
                 onResume: { entry in
                     SessionEntryResumeCoordinator.resume(entry, tabManager: tabManager)
+                },
+                onRename: { entry in
+                    panel.renameSessionEntry(entry, tabManager: tabManager, sessionIndexStore: panel.sessionIndexStore)
                 }
             )
             .background(

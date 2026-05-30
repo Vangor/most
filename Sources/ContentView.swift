@@ -2196,6 +2196,9 @@ struct ContentView: View {
             onResumeSession: { entry in
                 resumeSession(entry: entry)
             },
+            onRenameSession: { entry in
+                renameSessionEntry(entry)
+            },
             onOpenFilePreview: { filePath in
                 openFilePreviewFromSidebar(filePath: filePath)
             },
@@ -2487,6 +2490,28 @@ struct ContentView: View {
 
     private func resumeSession(entry: SessionEntry) {
         SessionEntryResumeCoordinator.resume(entry, tabManager: tabManager)
+    }
+
+    /// Rename handler for the session-index sidebar. Routes through the shared
+    /// `promptRenameOpenSession` path when the session is currently open in a
+    /// tab; falls back to a standalone NSAlert + the session-names store when
+    /// the session is historical (closed). Either way, `sessionIndexStore` is
+    /// updated so the sidebar row reflects the new name immediately.
+    private func renameSessionEntry(_ entry: SessionEntry) {
+        // Try to find the session in any open workspace.
+        for workspace in tabManager.tabs {
+            if workspace.restoredAgentSnapshotsByPanelId.values.contains(where: { $0.sessionId == entry.sessionId }) {
+                workspace.promptRenameOpenSession(bySessionId: entry.sessionId) { [self] newName in
+                    sessionIndexStore.setCustomName(newName, forSessionId: entry.sessionId)
+                }
+                return
+            }
+        }
+
+        // Session is not currently open — show a standalone alert.
+        let currentName = entry.customName ?? entry.displayTitle
+        guard let newName = Workspace.runRenameAlert(currentName: currentName) else { return }
+        sessionIndexStore.setCustomName(newName, forSessionId: entry.sessionId)
     }
 
     func openRightSidebarToolPane(_ mode: RightSidebarMode) {

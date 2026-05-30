@@ -116512,6 +116512,23 @@
         }
       }
     },
+    "sessionIndex.row.rename": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rename…"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "名前を変更…"
+          }
+        }
+      }
+    },
     "sessionIndex.section.noChats": {
       "extractionState": "manual",
       "localizations": {

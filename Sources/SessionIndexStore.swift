@@ -282,11 +282,80 @@ final class SessionIndexStore: ObservableObject {
     private var cachedSectionsRevision: UInt64?
     private var cachedSections: [IndexSection] = []
 
+    // MARK: - Custom session names (sessionId → user-set display name)
+
+    /// In-memory map of sessionId → user-set display name. Persisted to
+    /// `~/.config/cmux/session-names.json`. Applied to entries after every
+    /// `reload()` and immediately on `setCustomName(_:forSessionId:)`.
+    private(set) var sessionCustomNames: [String: String] = [:]
+
+    /// URL of the on-disk session-names JSON file.
+    private static var sessionNamesFileURL: URL {
+        let configDir = (("~/.config/cmux") as NSString).expandingTildeInPath
+        return URL(fileURLWithPath: configDir).appendingPathComponent("session-names.json")
+    }
+
+    /// Load persisted custom names from disk. Returns an empty dict on error.
+    private static func loadSessionCustomNames() -> [String: String] {
+        let url = sessionNamesFileURL
+        guard let data = try? Data(contentsOf: url),
+              let dict = try? JSONDecoder().decode([String: String].self, from: data) else {
+            return [:]
+        }
+        return dict
+    }
+
+    /// Persist `sessionCustomNames` to disk (fire-and-forget, errors are logged).
+    private func saveSessionCustomNames() {
+        let dict = sessionCustomNames
+        let url = Self.sessionNamesFileURL
+        Task.detached(priority: .utility) {
+            do {
+                let dir = url.deletingLastPathComponent()
+                try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+                let data = try JSONEncoder().encode(dict)
+                try data.write(to: url, options: .atomic)
+            } catch {
+                sessionIndexLogger.error("session-names save failed: \(error, privacy: .public)")
+            }
+        }
+    }
+
+    /// Set (or clear) the custom display name for a session and immediately
+    /// update the in-memory entries. Also persists to disk.
+    func setCustomName(_ name: String?, forSessionId sessionId: String) {
+        let trimmed = name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if trimmed.isEmpty {
+            guard sessionCustomNames[sessionId] != nil else { return }
+            sessionCustomNames.removeValue(forKey: sessionId)
+        } else {
+            guard sessionCustomNames[sessionId] != trimmed else { return }
+            sessionCustomNames[sessionId] = trimmed
+        }
+        // Patch in-memory entries without a full rescan.
+        entries = entries.map { entry in
+            guard entry.sessionId == sessionId else { return entry }
+            return entry.withCustomName(trimmed.isEmpty ? nil : trimmed)
+        }
+        invalidateSectionsCache()
+        saveSessionCustomNames()
+    }
+
+    /// Apply the current `sessionCustomNames` to a freshly-scanned entry list.
+    private func applyCustomNamesToEntries(_ scanned: [SessionEntry]) -> [SessionEntry] {
+        guard !sessionCustomNames.isEmpty else { return scanned }
+        return scanned.map { entry in
+            guard let name = sessionCustomNames[entry.sessionId] else { return entry }
+            return entry.withCustomName(name)
+        }
+    }
+
     init() {
         self.agentOrder = Self.loadAgentOrder()
         self.directoryOrder = Self.loadDirectoryOrder()
         let storedGrouping = UserDefaults.standard.string(forKey: Self.groupingKey)
         self.grouping = SessionGrouping(rawValue: storedGrouping ?? "") ?? .directory
+        self.sessionCustomNames = Self.loadSessionCustomNames()
     }
 
     /// Returns the sections for the current grouping mode, in the user-saved order.
@@ -670,7 +739,7 @@ final class SessionIndexStore: ObservableObject {
             await MainActor.run {
                 guard let self else { return }
                 if Task.isCancelled { return }
-                self.entries = scanned
+                self.entries = self.applyCustomNamesToEntries(scanned)
                 self.isLoading = false
                 self.backfillAgentOrderFromEntries()
                 self.backfillDirectoryOrderFromEntries()

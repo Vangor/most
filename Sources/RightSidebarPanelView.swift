@@ -155,6 +155,10 @@ struct RightSidebarPanelView: View {
     let titlebarHeight: CGFloat
     let workspaceId: UUID?
     let onResumeSession: ((SessionEntry) -> Void)?
+    /// Renames a session entry. Routes through `promptRenamePanel` for
+    /// currently-open sessions; falls back to the session-names store for
+    /// closed sessions.
+    let onRenameSession: ((SessionEntry) -> Void)?
     let onOpenFilePreview: (String) -> Void
     let onOpenAsPane: (RightSidebarMode) -> Void
     let onClose: () -> Void
@@ -427,7 +431,7 @@ struct RightSidebarPanelView: View {
                 presentation: .find
             )
         case .sessions:
-            SessionIndexView(store: sessionIndexStore, onResume: onResumeSession)
+            SessionIndexView(store: sessionIndexStore, onResume: onResumeSession, onRename: onRenameSession)
                 .onAppear {
                     sessionIndexStore.setCurrentDirectoryIfChanged(sessionIndexDirectory)
                 }
