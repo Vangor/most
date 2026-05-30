@@ -156,7 +156,8 @@ For users who live in notifications and want unread handling on one key family. 
 "$CMUX_SETTINGS" set shortcuts.bindings.markOldestUnreadAndJumpNext cmd+shift+j
 "$CMUX_SETTINGS" set shortcuts.bindings.toggleUnread cmd+opt+u
 "$CMUX_SETTINGS" set shortcuts.bindings.triggerFlash cmd+shift+h
-"$CMUX_SETTINGS" set shortcuts.bindings.focusRightSidebar cmd+shift+e
+"$CMUX_SETTINGS" set shortcuts.bindings.openFeed cmd+e
+"$CMUX_SETTINGS" set shortcuts.bindings.openVault cmd+shift+e
 ```
 
 ### Workspace And Surface Lanes

@@ -12425,6 +12425,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             return true
         }
 
+        if matchConfiguredShortcut(event: event, action: .openFeed) {
+            let preferredWindow = mainWindowForShortcutEvent(event)
+            _ = focusRightSidebarInActiveMainWindow(mode: .feed, focusFirstItem: true, preferredWindow: preferredWindow)
+            return true
+        }
+
+        if matchConfiguredShortcut(event: event, action: .openVault) {
+            let preferredWindow = mainWindowForShortcutEvent(event)
+            _ = focusRightSidebarInActiveMainWindow(mode: .sessions, focusFirstItem: true, preferredWindow: preferredWindow)
+            return true
+        }
+
         // Sidebar font size zoom (⌘+ / ⌘−).
         // The `.sidebarFontSize` context gates these away from browser and
         // terminal focus, so they only fire when a sidebar (or no specialized

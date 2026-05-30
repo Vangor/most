@@ -970,6 +970,8 @@
               "toggleUnread",
               "markOldestUnreadAndJumpNext",
               "focusRightSidebar",
+              "openFeed",
+              "openVault",
               "switchRightSidebarToFiles",
               "switchRightSidebarToFind",
               "switchRightSidebarToSessions",

@@ -105,7 +105,14 @@ export const shortcutCategories: ShortcutCategory[] = [
       { id: "selectWorkspaceByNumber", combos: [["⌘", "1…9"]], description: { en: "Select workspace 1…9", ja: "ワークスペース1…9を選択" } },
       { id: "renameWorkspace", combos: [["⌘", "⇧", "R"]], description: { en: "Rename workspace", ja: "ワークスペース名を変更" } },
       { id: "editWorkspaceDescription", combos: [["⌥", "⌘", "E"]], description: { en: "Edit workspace description", ja: "ワークスペースの説明を編集" } },
-      { id: "focusRightSidebar", combos: [["⌘", "⇧", "E"]], description: { en: "Toggle right-sidebar focus", ja: "右サイドバーのフォーカスを切り替え" } },
+      { id: "openFeed", combos: [["⌘", "E"]], description: { en: "Open Feed", ja: "フィードを開く" } },
+      { id: "openVault", combos: [["⌘", "⇧", "E"]], description: { en: "Open Vault", ja: "Vaultを開く" } },
+      {
+        id: "focusRightSidebar",
+        combos: [],
+        description: { en: "Toggle right-sidebar focus", ja: "右サイドバーのフォーカスを切り替え" },
+        note: { en: "unbound by default", ja: "デフォルトでは未割り当て" },
+      },
       {
         id: "navigateRightSidebarRows",
         combos: [["J / K"], ["⌃", "N / P"], ["H / L"]],
@@ -197,7 +204,12 @@ export const shortcutCategories: ShortcutCategory[] = [
       { id: "findNext", combos: [["⌘", "G"]], description: { en: "Find next", ja: "次を検索" } },
       { id: "findPrevious", combos: [["⌥", "⌘", "G"]], description: { en: "Find previous", ja: "前を検索" } },
       { id: "hideFind", combos: [["⌥", "⌘", "⇧", "F"]], description: { en: "Hide find bar", ja: "検索バーを隠す" } },
-      { id: "useSelectionForFind", combos: [["⌘", "E"]], description: { en: "Use selection for find", ja: "選択範囲で検索" } },
+      {
+        id: "useSelectionForFind",
+        combos: [],
+        description: { en: "Use selection for find", ja: "選択範囲で検索" },
+        note: { en: "unbound by default", ja: "デフォルトでは未割り当て" },
+      },
     ],
   },
   {

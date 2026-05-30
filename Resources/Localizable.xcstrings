@@ -114157,6 +114157,40 @@
         }
       }
     },
+    "shortcut.openFeed.label": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Feed"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "フィードを開く"
+          }
+        }
+      }
+    },
+    "shortcut.openVault.label": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Vault"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vaultを開く"
+          }
+        }
+      }
+    },
     "shortcut.increaseSidebarFontSize.label": {
       "extractionState": "manual",
       "localizations": {
