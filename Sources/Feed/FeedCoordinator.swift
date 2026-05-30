@@ -265,6 +265,43 @@ extension FeedCoordinator {
         store?.clearInactionable()
     }
 
+    /// Removes every feed item unconditionally, including still-pending
+    /// actionable cards. If there are pending items the user hasn't acted
+    /// on, shows a confirmation alert first so accidental clears don't lose
+    /// live questions. Single authoritative path — the Clear button routes here.
+    @MainActor
+    func clearAllItems() {
+        guard let store else { return }
+        let pendingCount = store.pending.count
+        if pendingCount > 0 {
+            let total = store.items.count
+            let alert = NSAlert()
+            alert.messageText = String(
+                localized: "feed.clear.all.confirm.title",
+                defaultValue: "Clear all feed items?"
+            )
+            let bodyFormat = String(
+                localized: "feed.clear.all.confirm.body",
+                defaultValue: "This will remove all %lld items, including %lld pending %@ that still need a response."
+            )
+            let questionWord = pendingCount == 1
+                ? String(localized: "feed.clear.all.confirm.question.singular", defaultValue: "question")
+                : String(localized: "feed.clear.all.confirm.question.plural", defaultValue: "questions")
+            alert.informativeText = String(format: bodyFormat, total, pendingCount, questionWord)
+            alert.addButton(withTitle: String(
+                localized: "feed.clear.all.confirm.clear",
+                defaultValue: "Clear All"
+            ))
+            alert.addButton(withTitle: String(
+                localized: "feed.clear.all.confirm.cancel",
+                defaultValue: "Cancel"
+            ))
+            alert.alertStyle = .warning
+            guard alert.runModal() == .alertFirstButtonReturn else { return }
+        }
+        store.clearAll()
+    }
+
     /// Removes a single feed item unconditionally regardless of status
     /// (including `.pending`). This is the per-row dismiss path — the
     /// user can remove any card they no longer need, even if the agent

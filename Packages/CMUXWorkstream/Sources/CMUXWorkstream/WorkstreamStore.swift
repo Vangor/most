@@ -262,6 +262,14 @@ public final class WorkstreamStore {
         }
     }
 
+    /// Removes every item from the in-memory ring unconditionally,
+    /// including still-pending actionable items. This is the "Clear all"
+    /// path — the feed Clear button routes here so stale pending cards
+    /// from dead/remote sessions are actually removed.
+    public func clearAll() {
+        items.removeAll()
+    }
+
     /// Marks every pending item with `ppid` as `.expired`. Meant to
     /// be called from a kqueue/DispatchSource process-exit handler
     /// so the exact moment an agent dies, its pending cards close.
