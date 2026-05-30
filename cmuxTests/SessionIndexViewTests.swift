@@ -4,7 +4,11 @@ import SQLite3
 import SwiftUI
 import XCTest
 
-#if canImport(cmux_DEV)
+#if canImport(most_DEV)
+@testable import most_DEV
+#elseif canImport(most)
+@testable import most
+#elseif canImport(cmux_DEV)
 @testable import cmux_DEV
 #elseif canImport(cmux)
 @testable import cmux
@@ -277,6 +281,86 @@ final class SessionIndexViewTests: XCTestCase {
         }
     }
 
+    /// Regression (the real 2026-05-30 dogfood bug): cmux and Claude Code agents
+    /// place worktrees under `/.claude/worktrees/`, NOT `/.worktrees/`. The old
+    /// classifier only matched `/.worktrees/`, so every cmux worktree session was
+    /// bucketed as `.main` → only one category → headers never rendered (flat list).
+    /// Verified against the user's actual on-disk session cwds.
+    func testClaudeWorktreesConventionIsClassifiedAsWorktrees() {
+        preservingSessionIndexDefaults {
+            let store = SessionIndexStore()
+            store.setCategorizationDirectoryIfChanged("/Users/vangor/Git/cmux")
+
+            let mainEntry = makeEntry(title: "cmux main", cwd: "/Users/vangor/Git/cmux")
+            let claudeWorktree = makeEntry(
+                title: "agent worktree",
+                cwd: "/Users/vangor/Git/cmux/.claude/worktrees/agent-abc123"
+            )
+            store.replaceEntriesForTesting([mainEntry, claudeWorktree])
+
+            let categorized = store.categorizedSectionsForCurrentGrouping()
+            let categories = categorized.map(\.category)
+            XCTAssertTrue(
+                categories.contains(.worktrees),
+                "A session under /.claude/worktrees/ must be classified .worktrees. Got: \(categories)"
+            )
+            XCTAssertGreaterThan(
+                categorized.count, 1,
+                "Main + Worktrees should yield 2 categories so headers render. Got: \(categories)"
+            )
+            let worktreeTitles = categorized.first(where: { $0.category == .worktrees })?
+                .sections.flatMap(\.entries).map(\.title) ?? []
+            XCTAssertTrue(worktreeTitles.contains("agent worktree"), "Got: \(worktreeTitles)")
+        }
+    }
+
+    /// Pure-function coverage of the shared classifier for both worktree
+    /// conventions and the parent-dir case (matches the user's real cwd layout
+    /// where `~/Git` is the reference and repos + their .claude/worktrees sit under it).
+    func testScopeCategoryRecognizesBothWorktreeConventions() {
+        let dir = "/Users/vangor/Git"
+        XCTAssertEqual(SessionIndexStore.scopeCategory(forCwd: "/Users/vangor/Git", relativeTo: dir), .main)
+        XCTAssertEqual(SessionIndexStore.scopeCategory(forCwd: "/Users/vangor/Git/cmux", relativeTo: dir), .main)
+        XCTAssertEqual(
+            SessionIndexStore.scopeCategory(forCwd: "/Users/vangor/Git/cmux/.claude/worktrees/agent-1", relativeTo: dir),
+            .worktrees,
+            "Claude Code convention"
+        )
+        XCTAssertEqual(
+            SessionIndexStore.scopeCategory(forCwd: "/Users/vangor/Git/ops-layer/.worktrees/feature-x", relativeTo: dir),
+            .worktrees,
+            "ops-layer /si convention"
+        )
+        XCTAssertEqual(SessionIndexStore.scopeCategory(forCwd: "/Users/other/thing", relativeTo: dir), .other)
+        XCTAssertEqual(SessionIndexStore.scopeCategory(forCwd: nil, relativeTo: dir), .other)
+    }
+
+    // MARK: - displayTitle — custom name + agent name surfacing (BUG #2)
+
+    /// A user-set custom name (via the sidebar Rename action) must override the
+    /// raw first-message text in the row, and clearing it (blank) must fall back
+    /// to the message text. Uses the pure `withCustomName` helper so no
+    /// `session-names.json` is written to the real config dir.
+    func testCustomNameOverridesMessageTextInDisplayTitle() {
+        let entry = makeEntry(title: "please fix the auth bug in the login flow")
+        XCTAssertEqual(
+            entry.displayTitle, "please fix the auth bug in the login flow",
+            "Un-named Claude session falls back to its first-message text."
+        )
+        XCTAssertEqual(entry.withCustomName("Auth bug").displayTitle, "Auth bug")
+        XCTAssertEqual(
+            entry.withCustomName("   ").displayTitle, "please fix the auth bug in the login flow",
+            "A blank rename clears the custom name and reverts to message text."
+        )
+    }
+
+    /// Agent-provided names (e.g. Codex `thread_name_updated`, already parsed
+    /// into `title`) must surface directly in the row without a manual rename.
+    func testAgentProvidedNameSurfacesAsDisplayTitle() {
+        let entry = makeEntry(agent: .codex, title: "Refactor billing module")
+        XCTAssertEqual(entry.displayTitle, "Refactor billing module")
+    }
+
     // MARK: - categorizationDirectory — toggle-independent header visibility (BUG regression)
 
     /// Regression: category headers (Main / Worktrees / Other) never appeared with the
@@ -511,7 +595,8 @@ final class SessionIndexViewTests: XCTestCase {
             section: section,
             search: search,
             loadSnapshot: loadSnapshot,
-            onResume: nil
+            onResume: nil,
+            onRename: nil
         )
         return SessionPopoverHarness(host: host, section: section, search: search, loadSnapshot: loadSnapshot)
     }
