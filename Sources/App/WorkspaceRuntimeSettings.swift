@@ -359,12 +359,19 @@ enum AgentHibernationTrackingGate {
 
 enum RightSidebarBetaFeatureSettings {
     static let dockEnabledKey = "rightSidebar.beta.dock.enabled"
+    static let fleetEnabledKey = "rightSidebar.beta.fleet.enabled"
 
     static let defaultDockEnabled = false
+    static let defaultFleetEnabled = false
 
     nonisolated static func isDockEnabled(defaults: UserDefaults = .standard) -> Bool {
         guard defaults.object(forKey: dockEnabledKey) != nil else { return defaultDockEnabled }
         return defaults.bool(forKey: dockEnabledKey)
+    }
+
+    nonisolated static func isFleetEnabled(defaults: UserDefaults = .standard) -> Bool {
+        guard defaults.object(forKey: fleetEnabledKey) != nil else { return defaultFleetEnabled }
+        return defaults.bool(forKey: fleetEnabledKey)
     }
 }
 

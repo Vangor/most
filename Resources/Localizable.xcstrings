@@ -70291,6 +70291,9 @@
       }
     },
     "settings.betaFeatures.dock": { "extractionState": "manual", "localizations": { "en": { "stringUnit": { "state": "translated", "value": "Dock" } }, "ja": { "stringUnit": { "state": "translated", "value": "Dock" } } } },
+    "settings.betaFeatures.fleet": { "extractionState": "manual", "localizations": { "en": { "stringUnit": { "state": "translated", "value": "Fleet" } }, "ja": { "stringUnit": { "state": "translated", "value": "フリート" } } } },
+    "settings.betaFeatures.fleet.subtitleOff": { "extractionState": "manual", "localizations": { "en": { "stringUnit": { "state": "translated", "value": "Hides Fleet from the right sidebar until you enable it here." } }, "ja": { "stringUnit": { "state": "translated", "value": "ここで有効にするまで、フリートを右サイドバーから隠します。" } } } },
+    "settings.betaFeatures.fleet.subtitleOn": { "extractionState": "manual", "localizations": { "en": { "stringUnit": { "state": "translated", "value": "Shows Fleet in the right sidebar for monitoring the drone fleet via the knowledge endpoint." } }, "ja": { "stringUnit": { "state": "translated", "value": "フリートを右サイドバーに表示し、ナレッジエンドポイント経由でドローンフリートを監視します。" } } } },
     "settings.betaFeatures.dock.subtitleOff": { "extractionState": "manual", "localizations": { "en": { "stringUnit": { "state": "translated", "value": "Hides Dock from the right sidebar until you enable it here." } }, "ja": { "stringUnit": { "state": "translated", "value": "ここで有効にするまで、Dock を右サイドバーから隠します。" } } } },
     "settings.betaFeatures.dock.subtitleOn": { "extractionState": "manual", "localizations": { "en": { "stringUnit": { "state": "translated", "value": "Shows Dock in the right sidebar mode switcher for custom terminal controls." } }, "ja": { "stringUnit": { "state": "translated", "value": "Dock を右サイドバーのモード切り替えに表示し、カスタム端末コントロールを使えるようにします。" } } } },
     "settings.betaFeatures.warning": { "extractionState": "manual", "localizations": { "en": { "stringUnit": { "state": "translated", "value": "Dock is unstable and may change or break. Enable it only when you are testing it." } }, "ja": { "stringUnit": { "state": "translated", "value": "Dock は不安定で、変更されたり壊れたりする可能性があります。テストする場合だけ有効にしてください。" } } } },
@@ -117035,6 +117038,108 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dock"
+          }
+        }
+      }
+    },
+    "rightSidebar.mode.fleet": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fleet"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "フリート"
+          }
+        }
+      }
+    },
+    "fleet.panel.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "FLEET"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "フリート"
+          }
+        }
+      }
+    },
+    "fleet.panel.offline": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "offline"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "オフライン"
+          }
+        }
+      }
+    },
+    "fleet.panel.offline.detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Knowledge endpoint unreachable"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ナレッジエンドポイントに接続できません"
+          }
+        }
+      }
+    },
+    "fleet.panel.refresh": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Refresh Fleet"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "フリートを更新"
+          }
+        }
+      }
+    },
+    "shortcut.switchRightSidebarToFleet.label": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show Sidebar Fleet"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "サイドバー フリートを表示"
           }
         }
       }

@@ -200,7 +200,11 @@
 		FEED0A00000000000000F007 /* feed-tui in Resources */ = {isa = PBXBuildFile; fileRef = FEED0A00000000000000F006 /* feed-tui */; };
 		FEED0000000000000000F00D /* FeedButtonStyleDebugWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED0000000000000000F00C /* FeedButtonStyleDebugWindowController.swift */; };
 		FEED0000000000000000F002 /* FeedCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED0000000000000000F001 /* FeedCoordinator.swift */; };
+		FLET0000000000000000F002 /* FleetModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = FLET0000000000000000F001 /* FleetModels.swift */; };
+		FLET0000000000000000F005 /* FleetStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = FLET0000000000000000F004 /* FleetStore.swift */; };
+		FLET0000000000000000F007 /* FleetPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FLET0000000000000000F006 /* FleetPanelView.swift */; };
 		FEEDC0DEC0DEC0DEC0DE0001 /* FeedCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEEDC0DEC0DEC0DEC0DE0002 /* FeedCoordinatorTests.swift */; };
+		FLET0000000000000000T001 /* FleetMappingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FLET0000000000000000T002 /* FleetMappingTests.swift */; };
 		FEED0000000000000000F005 /* FeedPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED0000000000000000F004 /* FeedPanelView.swift */; };
 		FEED0000000000000000F011 /* FeedPanelViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED0000000000000000F010 /* FeedPanelViewModel.swift */; };
 		FEED0000000000000000F013 /* FeedPermissionActionPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED0000000000000000F012 /* FeedPermissionActionPolicy.swift */; };
@@ -786,7 +790,11 @@
 		FEED0A00000000000000F006 /* feed-tui */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder; path = "feed-tui"; sourceTree = "<group>"; };
 		FEED0000000000000000F00C /* FeedButtonStyleDebugWindowController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FeedButtonStyleDebugWindowController.swift; sourceTree = "<group>"; };
 		FEED0000000000000000F001 /* FeedCoordinator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FeedCoordinator.swift; sourceTree = "<group>"; };
+		FLET0000000000000000F001 /* FleetModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FleetModels.swift; sourceTree = "<group>"; };
+		FLET0000000000000000F004 /* FleetStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FleetStore.swift; sourceTree = "<group>"; };
+		FLET0000000000000000F006 /* FleetPanelView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FleetPanelView.swift; sourceTree = "<group>"; };
 		FEEDC0DEC0DEC0DEC0DE0002 /* FeedCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedCoordinatorTests.swift; sourceTree = "<group>"; };
+		FLET0000000000000000T002 /* FleetMappingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FleetMappingTests.swift; sourceTree = "<group>"; };
 		FEED0000000000000000F004 /* FeedPanelView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FeedPanelView.swift; sourceTree = "<group>"; };
 		FEED0000000000000000F010 /* FeedPanelViewModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FeedPanelViewModel.swift; sourceTree = "<group>"; };
 		FEED0000000000000000F012 /* FeedPermissionActionPolicy.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FeedPermissionActionPolicy.swift; sourceTree = "<group>"; };
@@ -1210,6 +1218,17 @@
 			path = Feed;
 			sourceTree = "<group>";
 		};
+		FLET0000000000000000F003 /* Fleet */ = {
+			isa = PBXGroup;
+			children = (
+				FLET0000000000000000F001 /* FleetModels.swift */,
+				FLET0000000000000000F004 /* FleetStore.swift */,
+				FLET0000000000000000F006 /* FleetPanelView.swift */,
+			);
+			name = Fleet;
+			path = Fleet;
+			sourceTree = "<group>";
+		};
 		3196C9C2D01F054C1D3385DD /* cmuxUITests */ = {
 			isa = PBXGroup;
 			children = (
@@ -1569,6 +1588,7 @@
 				105D8421DF4E2E09D255D785 /* Auth */,
 				590E4F5F342E5B27010ECC8D /* Cloud */,
 				FEED0000000000000000F003 /* Feed */,
+				FLET0000000000000000F003 /* Fleet */,
 			);
 			path = Sources;
 			sourceTree = "<group>";
@@ -1715,6 +1735,7 @@
 				F1C3F1DBF6BF5D7223C4A30C /* SidebarMarkdownRendererTests.swift */,
 				14A7DC53B9CA33BE2A421711 /* WorkspacePullRequestSidebarTests.swift */,
 				FEEDC0DEC0DEC0DEC0DE0002 /* FeedCoordinatorTests.swift */,
+				FLET0000000000000000T002 /* FleetMappingTests.swift */,
 				1D301919B10F22B8708E8883 /* WorkspaceManualUnreadTests.swift */,
 				EE0171AF1F49F7547191CEE5 /* SidebarWidthPolicyTests.swift */,
 				51D800000000000000000002 /* SidebarIdentifierFormattingTests.swift */,
@@ -2149,6 +2170,9 @@
 				FEED0000000000000000F002 /* FeedCoordinator.swift in Sources */,
 				FEED0000000000000000F005 /* FeedPanelView.swift in Sources */,
 				FEED0000000000000000F011 /* FeedPanelViewModel.swift in Sources */,
+				FLET0000000000000000F002 /* FleetModels.swift in Sources */,
+				FLET0000000000000000F005 /* FleetStore.swift in Sources */,
+				FLET0000000000000000F007 /* FleetPanelView.swift in Sources */,
 				FEED0000000000000000F013 /* FeedPermissionActionPolicy.swift in Sources */,
 				FEED0000000000000000F00B /* FeedPreviewWindowController.swift in Sources */,
 				FEED0000000000000000F00F /* FeedTextEditorDebugWindowController.swift in Sources */,
@@ -2478,6 +2502,7 @@
 				C0DEF4120000000000000001 /* CommandPaletteSettingsToggleTests.swift in Sources */,
 					C1713006C1713006C1713006 /* CommandPaletteShortcutCustomizationTests.swift in Sources */,
 				FEEDC0DEC0DEC0DEC0DE0001 /* FeedCoordinatorTests.swift in Sources */,
+				FLET0000000000000000T001 /* FleetMappingTests.swift in Sources */,
 				D0B10018A1B2C3D4E5F60001 /* FileDropOverlayViewTests.swift in Sources */,
 				FE002101 /* FileExplorerRootResolverTests.swift in Sources */,
 				B37A0000000000000000000B /* FileExplorerStateModePersistenceTests.swift in Sources */,

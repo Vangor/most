@@ -7,6 +7,10 @@ extension CodingUserInfoKey {
     static let cmuxWorkspaceColorDefaults = CodingUserInfoKey(rawValue: "cmuxWorkspaceColorDefaults")!
 }
 
+struct CmuxFleetConfigDefinition: Codable, Sendable {
+    var knowledgeEndpoint: String?
+}
+
 struct CmuxConfigFile: Codable, Sendable {
     var actions: [String: CmuxConfigActionDefinition]
     var ui: CmuxConfigUIDefinition?
@@ -15,9 +19,10 @@ struct CmuxConfigFile: Codable, Sendable {
     var surfaceTabBarButtons: [CmuxSurfaceTabBarButton]?
     var commands: [CmuxCommandDefinition]
     var vault: CmuxVaultConfigDefinition?
+    var fleet: CmuxFleetConfigDefinition?
 
     private enum CodingKeys: String, CodingKey {
-        case actions, ui, notifications, newWorkspaceCommand, surfaceTabBarButtons, commands, vault
+        case actions, ui, notifications, newWorkspaceCommand, surfaceTabBarButtons, commands, vault, fleet
     }
 
     init(
@@ -27,7 +32,8 @@ struct CmuxConfigFile: Codable, Sendable {
         newWorkspaceCommand: String? = nil,
         surfaceTabBarButtons: [CmuxSurfaceTabBarButton]? = nil,
         commands: [CmuxCommandDefinition] = [],
-        vault: CmuxVaultConfigDefinition? = nil
+        vault: CmuxVaultConfigDefinition? = nil,
+        fleet: CmuxFleetConfigDefinition? = nil
     ) {
         self.actions = actions
         self.ui = ui
@@ -36,6 +42,7 @@ struct CmuxConfigFile: Codable, Sendable {
         self.surfaceTabBarButtons = surfaceTabBarButtons
         self.commands = commands
         self.vault = vault
+        self.fleet = fleet
     }
 
     init(from decoder: Decoder) throws {
@@ -83,6 +90,7 @@ struct CmuxConfigFile: Codable, Sendable {
         }
         commands = try container.decodeIfPresent([CmuxCommandDefinition].self, forKey: .commands) ?? []
         vault = try container.decodeIfPresent(CmuxVaultConfigDefinition.self, forKey: .vault)
+        fleet = try container.decodeIfPresent(CmuxFleetConfigDefinition.self, forKey: .fleet)
     }
 
     private static func normalizedActions(

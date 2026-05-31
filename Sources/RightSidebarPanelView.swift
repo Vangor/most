@@ -15,6 +15,7 @@ nonisolated enum RightSidebarMode: String, CaseIterable, Codable, Sendable {
     case sessions
     case feed
     case dock
+    case fleet
 
     var label: String {
         switch self {
@@ -23,6 +24,7 @@ nonisolated enum RightSidebarMode: String, CaseIterable, Codable, Sendable {
         case .sessions: return String(localized: "rightSidebar.mode.sessions", defaultValue: "Vault")
         case .feed: return String(localized: "rightSidebar.mode.feed", defaultValue: "Feed")
         case .dock: return String(localized: "rightSidebar.mode.dock", defaultValue: "Dock")
+        case .fleet: return String(localized: "rightSidebar.mode.fleet", defaultValue: "Fleet")
         }
     }
 
@@ -33,6 +35,7 @@ nonisolated enum RightSidebarMode: String, CaseIterable, Codable, Sendable {
         case .sessions: return "books.vertical"
         case .feed: return "dot.radiowaves.left.and.right"
         case .dock: return "dock.rectangle"
+        case .fleet: return "cpu"
         }
     }
 
@@ -43,6 +46,7 @@ nonisolated enum RightSidebarMode: String, CaseIterable, Codable, Sendable {
         case .sessions: return .switchRightSidebarToSessions
         case .feed: return .switchRightSidebarToFeed
         case .dock: return .switchRightSidebarToDock
+        case .fleet: return .switchRightSidebarToFleet
         }
     }
 }
@@ -74,6 +78,10 @@ extension RightSidebarMode {
         if KeyboardShortcutSettings.shortcut(for: .switchRightSidebarToDock).matches(event: event),
            RightSidebarMode.dock.isAvailable() {
             return .dock
+        }
+        if KeyboardShortcutSettings.shortcut(for: .switchRightSidebarToFleet).matches(event: event),
+           RightSidebarMode.fleet.isAvailable() {
+            return .fleet
         }
         return nil
     }
@@ -174,6 +182,8 @@ struct RightSidebarPanelView: View {
     private let focusShortcutHintYOffset = ShortcutHintDebugSettings.defaultRightSidebarFocusHintY
     @AppStorage(RightSidebarBetaFeatureSettings.dockEnabledKey)
     private var dockEnabled = RightSidebarBetaFeatureSettings.defaultDockEnabled
+    @AppStorage(RightSidebarBetaFeatureSettings.fleetEnabledKey)
+    private var fleetEnabled = RightSidebarBetaFeatureSettings.defaultFleetEnabled
     /// Scale multiplier derived from the `sidebar-font-size` Ghostty config key
     /// (the same key that drives the left sidebar). Default 1.0 = no change.
     @State private var fontScale: CGFloat = 1.0
@@ -191,7 +201,7 @@ struct RightSidebarPanelView: View {
     }
 
     private var availableModes: [RightSidebarMode] {
-        RightSidebarMode.availableModes(dockEnabled: dockEnabled)
+        RightSidebarMode.availableModes(dockEnabled: dockEnabled, fleetEnabled: fleetEnabled)
     }
 
     var body: some View {
@@ -435,6 +445,8 @@ struct RightSidebarPanelView: View {
             FeedPanelView(fontScale: fontScale)
         case .dock:
             DockPanelView(rootDirectory: sessionIndexDirectory, workspaceId: workspaceId, store: dockStore, fontScale: fontScale)
+        case .fleet:
+            FleetPanelView(fontScale: fontScale)
         }
     }
 

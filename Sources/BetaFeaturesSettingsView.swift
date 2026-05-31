@@ -2,6 +2,7 @@ import SwiftUI
 
 struct BetaFeaturesSettingsView: View {
     @Binding var dockEnabled: Bool
+    @Binding var fleetEnabled: Bool
 
     private var dockSubtitle: String {
         if dockEnabled {
@@ -13,6 +14,19 @@ struct BetaFeaturesSettingsView: View {
         return String(
             localized: "settings.betaFeatures.dock.subtitleOff",
             defaultValue: "Hides Dock from the right sidebar until you enable it here."
+        )
+    }
+
+    private var fleetSubtitle: String {
+        if fleetEnabled {
+            return String(
+                localized: "settings.betaFeatures.fleet.subtitleOn",
+                defaultValue: "Shows Fleet in the right sidebar for monitoring the drone fleet via the knowledge endpoint."
+            )
+        }
+        return String(
+            localized: "settings.betaFeatures.fleet.subtitleOff",
+            defaultValue: "Hides Fleet from the right sidebar until you enable it here."
         )
     }
 
@@ -41,6 +55,23 @@ struct BetaFeaturesSettingsView: View {
                     .accessibilityIdentifier("SettingsBetaDockToggle")
                     .accessibilityLabel(
                         String(localized: "settings.betaFeatures.dock", defaultValue: "Dock")
+                    )
+            }
+
+            SettingsCardDivider()
+
+            SettingsCardRow(
+                configurationReview: .settingsOnly,
+                String(localized: "settings.betaFeatures.fleet", defaultValue: "Fleet"),
+                subtitle: fleetSubtitle,
+                searchAnchorID: SettingsSearchIndex.settingID(for: .betaFeatures, idSuffix: "fleet")
+            ) {
+                Toggle("", isOn: $fleetEnabled)
+                    .labelsHidden()
+                    .controlSize(.small)
+                    .accessibilityIdentifier("SettingsBetaFleetToggle")
+                    .accessibilityLabel(
+                        String(localized: "settings.betaFeatures.fleet", defaultValue: "Fleet")
                     )
             }
         }

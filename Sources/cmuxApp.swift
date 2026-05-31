@@ -5346,6 +5346,8 @@ struct SettingsView: View {
     @AppStorage("sidebarMatchTerminalBackground") private var sidebarMatchTerminalBackground = false
     @AppStorage(RightSidebarBetaFeatureSettings.dockEnabledKey)
     private var rightSidebarDockEnabled = RightSidebarBetaFeatureSettings.defaultDockEnabled
+    @AppStorage(RightSidebarBetaFeatureSettings.fleetEnabledKey)
+    private var rightSidebarFleetEnabled = RightSidebarBetaFeatureSettings.defaultFleetEnabled
 
     @ObservedObject private var notificationStore = TerminalNotificationStore.shared
     @ObservedObject private var authManager = AuthManager.shared
@@ -7130,7 +7132,8 @@ struct SettingsView: View {
                     }
 
                     BetaFeaturesSettingsView(
-                        dockEnabled: $rightSidebarDockEnabled
+                        dockEnabled: $rightSidebarDockEnabled,
+                        fleetEnabled: $rightSidebarFleetEnabled
                     )
 
                     SettingsSectionHeader(title: String(localized: "settings.section.automation", defaultValue: "Automation"))
@@ -8133,6 +8136,7 @@ struct SettingsView: View {
         showBrowserImportHintOnBlankTabs = BrowserImportHintSettings.defaultShowOnBlankTabs
         isBrowserImportHintDismissed = BrowserImportHintSettings.defaultDismissed
         rightSidebarDockEnabled = RightSidebarBetaFeatureSettings.defaultDockEnabled
+        rightSidebarFleetEnabled = RightSidebarBetaFeatureSettings.defaultFleetEnabled
         openTerminalLinksInCmuxBrowser = BrowserLinkOpenSettings.defaultOpenTerminalLinksInCmuxBrowser
         interceptTerminalOpenCommandInCmuxBrowser = BrowserLinkOpenSettings.defaultInterceptTerminalOpenCommandInCmuxBrowser
         browserHostWhitelist = BrowserLinkOpenSettings.defaultBrowserHostWhitelist
