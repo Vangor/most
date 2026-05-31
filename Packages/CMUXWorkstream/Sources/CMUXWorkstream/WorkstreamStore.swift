@@ -21,6 +21,12 @@ public let WorkstreamDefaultHistoryPageSize = 300
 @MainActor
 @Observable
 public final class WorkstreamStore {
+    /// Safety TTL for stale pending actionable items restored from remote/cloud
+    /// sessions that have no locally watchable PID. This is intentionally long
+    /// enough to avoid expiring live questions during normal work, while still
+    /// reclaiming orphaned cards that never receive a SessionEnd signal.
+    public static let stalePendingTTL: TimeInterval = 6 * 60 * 60
+
     public private(set) var items: [WorkstreamItem] = []
     public private(set) var hasMorePersistedItems = false
     public private(set) var isLoadingOlderItems = false
@@ -200,6 +206,27 @@ public final class WorkstreamStore {
                 items[idx].status = .expired(at: now)
                 items[idx].updatedAt = now
             }
+        }
+    }
+
+    /// Marks stale pending actionable items as `.expired` when they are
+    /// older than the TTL and cannot be proven locally alive. This is the
+    /// safety net for remote/cloud sessions (`ppid == nil`) and dead local
+    /// agents that never emit SessionEnd or get caught by kqueue.
+    public func expireStalePending(
+        now: Date? = nil,
+        ttl: TimeInterval = WorkstreamStore.stalePendingTTL,
+        isProcessAlive: (Int) -> Bool = WorkstreamStore.defaultIsProcessAlive
+    ) {
+        let now = now ?? clock()
+        for idx in items.indices {
+            guard items[idx].status.isPending else { continue }
+            guard now.timeIntervalSince(items[idx].createdAt) > ttl else { continue }
+            if let ppid = items[idx].ppid, ppid > 0, isProcessAlive(ppid) {
+                continue
+            }
+            items[idx].status = .expired(at: now)
+            items[idx].updatedAt = now
         }
     }
 

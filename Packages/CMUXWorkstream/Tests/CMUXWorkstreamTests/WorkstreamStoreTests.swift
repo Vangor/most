@@ -106,6 +106,34 @@ struct WorkstreamStoreTests {
         }
     }
 
+    @Test("expireStalePending expires only old pending items that are not locally alive")
+    func expireStalePending() {
+        let clock = TestClock(initial: Date(timeIntervalSince1970: 0))
+        let ttl: TimeInterval = 60
+        let store = WorkstreamStore(ringCapacity: 10, clock: { clock.now })
+
+        store.ingest(.permission("remote-old", requestId: "r1", at: clock.now))
+        store.ingest(.permission("local-live", requestId: "r3", at: clock.now, ppid: 1000))
+        store.ingest(.permission("local-dead", requestId: "r4", at: clock.now, ppid: 2000))
+        clock.advance(ttl + 1)
+        store.ingest(.permission("remote-fresh", requestId: "r2", at: clock.now))
+
+        store.expireStalePending(now: clock.now, ttl: ttl) { pid in pid == 1000 }
+
+        if case .expired = store.items[0].status {
+            // ok
+        } else {
+            Issue.record("remote-old item should expire")
+        }
+        #expect(store.items[1].status.isPending)
+        if case .expired = store.items[2].status {
+            // ok
+        } else {
+            Issue.record("local-dead item should expire")
+        }
+        #expect(store.items[3].status.isPending)
+    }
+
     @Test("Telemetry items (toolUse) never enter pending")
     func telemetryNeverPending() {
         let store = WorkstreamStore(ringCapacity: 10)

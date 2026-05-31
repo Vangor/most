@@ -33,6 +33,7 @@ final class FeedCoordinator: @unchecked Sendable {
     /// cancel the source. Keyed by PID so the same agent spawning
     /// multiple prompts only installs one watcher.
     @MainActor private var pidWatchers: [Int: DispatchSourceProcess] = [:]
+    @MainActor private var stalePendingTimer: Timer?
     private let pidWatcherQueue = DispatchQueue(
         label: "cmux.feed.pidWatcher", qos: .utility
     )
@@ -48,6 +49,14 @@ final class FeedCoordinator: @unchecked Sendable {
         // agent is already gone. After this, live tracking is
         // kqueue-driven — no polling.
         store.expireAbandonedItems()
+        store.expireStalePending()
+        if stalePendingTimer == nil {
+            stalePendingTimer = Timer.scheduledTimer(withTimeInterval: 5 * 60, repeats: true) { [weak self] _ in
+                Task { @MainActor in
+                    self?.store?.expireStalePending()
+                }
+            }
+        }
         for ppid in store.pending.compactMap(\.ppid) {
             armPidWatcher(ppid: ppid)
         }
