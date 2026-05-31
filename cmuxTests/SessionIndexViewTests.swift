@@ -361,6 +361,34 @@ final class SessionIndexViewTests: XCTestCase {
         XCTAssertEqual(entry.displayTitle, "Refactor billing module")
     }
 
+    /// Claude transcripts carry a self-assigned name in a `custom-title` entry
+    /// (what `claude --resume` shows / `/title` sets). It must be surfaced as
+    /// the title, winning over the first-user-message fallback.
+    func testClaudeCustomTitleWinsOverFirstUserMessage() {
+        let head = """
+        {"type":"custom-title","customTitle":"FACTORY","sessionId":"s1"}
+        {"type":"user","message":{"role":"user","content":"please refactor the billing module end to end"}}
+        """
+        let parsed = SessionIndexStore.extractClaudeMetadata(head: head, tail: "", projectDir: "-Users-vangor-Git-cmux")
+        XCTAssertEqual(parsed.title, "FACTORY", "custom-title should win over the first user message")
+    }
+
+    /// A mid-session retitle (custom-title appearing later, i.e. in the tail)
+    /// overrides an earlier one.
+    func testClaudeCustomTitleTailOverridesHead() {
+        let head = "{\"type\":\"custom-title\",\"customTitle\":\"OLD\",\"sessionId\":\"s1\"}"
+        let tail = "{\"type\":\"custom-title\",\"customTitle\":\"NEW\",\"sessionId\":\"s1\"}"
+        let parsed = SessionIndexStore.extractClaudeMetadata(head: head, tail: tail, projectDir: "-Users-vangor-Git-cmux")
+        XCTAssertEqual(parsed.title, "NEW")
+    }
+
+    /// Without a custom-title, the first real user message is still used.
+    func testClaudeFallsBackToFirstUserMessageWhenNoCustomTitle() {
+        let head = "{\"type\":\"user\",\"message\":{\"role\":\"user\",\"content\":\"hello world task\"}}"
+        let parsed = SessionIndexStore.extractClaudeMetadata(head: head, tail: "", projectDir: "-Users-vangor-Git-cmux")
+        XCTAssertEqual(parsed.title, "hello world task")
+    }
+
     // MARK: - categorizationDirectory — toggle-independent header visibility (BUG regression)
 
     /// Regression: category headers (Main / Worktrees / Other) never appeared with the

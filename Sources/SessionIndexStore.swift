@@ -174,6 +174,25 @@ enum VaultScopeCategory: Hashable, Sendable {
     case worktrees
     /// Entry belongs to a different directory tree entirely.
     case other
+
+    /// Stable string key for persisting per-category UI state (e.g. which
+    /// categories the user has collapsed) to `UserDefaults`.
+    var persistenceKey: String {
+        switch self {
+        case .main: return "main"
+        case .worktrees: return "worktrees"
+        case .other: return "other"
+        }
+    }
+
+    init?(persistenceKey: String) {
+        switch persistenceKey {
+        case "main": self = .main
+        case "worktrees": self = .worktrees
+        case "other": self = .other
+        default: return nil
+        }
+    }
 }
 
 /// A group of sections belonging to one `VaultScopeCategory`. Produced by
@@ -970,7 +989,7 @@ final class SessionIndexStore: ObservableObject {
         return entries.filter { $0.modified >= cutoff }
     }
 
-    private struct ClaudeParsed {
+    struct ClaudeParsed {
         var title: String = ""
         var cwd: String?
         var branch: String?
@@ -1050,13 +1069,27 @@ final class SessionIndexStore: ObservableObject {
         return roots
     }
 
-    nonisolated private static func extractClaudeMetadata(head: String, tail: String, projectDir: String) -> ClaudeParsed {
+    nonisolated static func extractClaudeMetadata(head: String, tail: String, projectDir: String) -> ClaudeParsed {
         var out = ClaudeParsed()
         out.cwd = decodeClaudeProjectDir(projectDir)
+
+        // The Claude transcript carries a self-assigned session name in a
+        // `{"type":"custom-title","customTitle":"…"}` entry (what `claude
+        // --resume` shows and what `/title` sets). It's a real NAME, so it wins
+        // over the first-user-message fallback. A later entry (mid-session
+        // rename) overrides an earlier one, so tail (processed second) wins.
+        var customTitle: String?
+        func captureCustomTitle(_ obj: [String: Any]) {
+            guard (obj["type"] as? String) == "custom-title",
+                  let raw = obj["customTitle"] as? String else { return }
+            let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty { customTitle = trimmed }
+        }
 
         for line in head.split(separator: "\n", omittingEmptySubsequences: true) {
             guard let data = line.data(using: .utf8),
                   let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { continue }
+            captureCustomTitle(obj)
             let isMeta = (obj["isMeta"] as? Bool) ?? false
             if let cwdField = obj["cwd"] as? String, !cwdField.isEmpty {
                 out.cwd = cwdField
@@ -1095,6 +1128,7 @@ final class SessionIndexStore: ObservableObject {
         for line in tail.split(separator: "\n", omittingEmptySubsequences: true) {
             guard let data = line.data(using: .utf8),
                   let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { continue }
+            captureCustomTitle(obj)
             let type = obj["type"] as? String
             if type == "pr-link", let number = obj["prNumber"] as? Int,
                let url = obj["prUrl"] as? String {
@@ -1119,6 +1153,11 @@ final class SessionIndexStore: ObservableObject {
         // Strip the [1m] suffix some Claude internal model IDs carry (claude-opus-4-7[1m]).
         if let m = out.model, let bracket = m.firstIndex(of: "[") {
             out.model = String(m[..<bracket])
+        }
+        // A self-assigned session title is a real name — prefer it over the
+        // first-user-message fallback captured above.
+        if let customTitle {
+            out.title = customTitle
         }
         return out
     }
