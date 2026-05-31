@@ -153,7 +153,15 @@ public final class WorkstreamStore {
         if event.hookEventName == .sessionEnd {
             expireItems(forWorkstreamId: event.sessionId)
         }
-        supersedeAnsweredQuestions(inWorkstream: event.sessionId, before: event.receivedAt)
+        // Only "agent moved on" events supersede a prior pending question.
+        // NOT Notification (fires the instant the agent asks — it would kill
+        // the live question immediately) and NOT the async PreToolUse (its
+        // arrival can be reordered after the question). The card-creating
+        // PermissionRequest is safe because supersede runs before its item is
+        // inserted, so a fresh question never supersedes itself.
+        if Self.isAgentProgressEvent(event.hookEventName) {
+            supersedeAnsweredQuestions(inWorkstream: event.sessionId, before: event.receivedAt)
+        }
         let item = makeItem(from: event)
         insert(item)
         updateContextIndex(with: item)
@@ -192,6 +200,21 @@ public final class WorkstreamStore {
     /// AskUserQuestion/PermissionRequest hooks block the agent, so any
     /// later event in the same workstream means the prior blocking question
     /// has been answered and can leave the feed.
+    /// Hook events that reliably mean the agent has unblocked and moved past a
+    /// prior blocking question. Deliberately excludes `.notification` (fires
+    /// while the agent is still waiting for input), `.preToolUse` (async — can
+    /// be reordered after the question it precedes), `.sessionStart`, and
+    /// `.subagentStop` (a subagent finishing is not the parent answering).
+    static func isAgentProgressEvent(_ name: WorkstreamEvent.HookEventName) -> Bool {
+        switch name {
+        case .userPromptSubmit, .stop, .sessionEnd, .postToolUse, .permissionRequest:
+            return true
+        case .sessionStart, .preToolUse, .notification, .subagentStop,
+             .askUserQuestion, .exitPlanMode, .todoWrite:
+            return false
+        }
+    }
+
     public func supersedeAnsweredQuestions(inWorkstream workstreamId: String, before cutoff: Date) {
         for idx in items.indices {
             guard items[idx].status.isPending,

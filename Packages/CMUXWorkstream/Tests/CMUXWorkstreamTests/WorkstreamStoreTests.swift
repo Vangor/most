@@ -231,9 +231,8 @@ struct WorkstreamStoreTests {
         clock.advance(10)
         store.ingest(WorkstreamEvent(
             sessionId: "ws-1",
-            hookEventName: .preToolUse,
+            hookEventName: .stop,
             source: "claude",
-            toolName: "Read",
             receivedAt: t1
         ))
 
@@ -295,9 +294,8 @@ struct WorkstreamStoreTests {
         clock.advance(10)
         store.ingest(WorkstreamEvent(
             sessionId: "ws-2",
-            hookEventName: .preToolUse,
+            hookEventName: .stop,
             source: "claude",
-            toolName: "Read",
             receivedAt: t1
         ))
 
@@ -306,6 +304,40 @@ struct WorkstreamStoreTests {
         #expect(store.items[0].status.isPending)
         #expect(store.items[1].workstreamId == "ws-2")
         #expect(store.items[1].status == .telemetry)
+    }
+
+    @Test("Notification and PreToolUse do NOT supersede a still-pending question")
+    func notificationDoesNotSupersedePendingQuestion() {
+        let t0 = Date(timeIntervalSince1970: 0)
+        let t1 = t0.addingTimeInterval(10)
+        let t2 = t1.addingTimeInterval(10)
+        let clock = TestClock(initial: t0)
+        let store = WorkstreamStore(ringCapacity: 10, clock: { clock.now })
+
+        store.ingest(.question("ws-1", requestId: "q1", at: t0))
+        #expect(store.items[0].status.isPending)
+
+        // Notification fires the instant the agent asks — it must NOT clear the
+        // live question (this was the "question flashes for a second" bug).
+        clock.advance(10)
+        store.ingest(WorkstreamEvent(
+            sessionId: "ws-1",
+            hookEventName: .notification,
+            source: "claude",
+            receivedAt: t1
+        ))
+        #expect(store.items[0].status.isPending)
+
+        // Async PreToolUse can be reordered after the question — also must NOT clear it.
+        clock.advance(10)
+        store.ingest(WorkstreamEvent(
+            sessionId: "ws-1",
+            hookEventName: .preToolUse,
+            source: "claude",
+            toolName: "Read",
+            receivedAt: t2
+        ))
+        #expect(store.items[0].status.isPending)
     }
 
     @Test("Prompt context carries into later permission requests")
