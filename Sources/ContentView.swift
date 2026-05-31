@@ -2552,7 +2552,7 @@ struct ContentView: View {
             return
         }
 
-        fileExplorerStore.showHiddenFiles = true
+        fileExplorerStore.showHiddenFiles = FileExplorerStore.preferredShowHiddenFiles
 
         if tab.isRemoteWorkspace {
             sessionIndexStore.setCurrentDirectoryIfChanged(nil)

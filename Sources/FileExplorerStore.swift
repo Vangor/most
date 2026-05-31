@@ -634,6 +634,14 @@ final class FileExplorerStore: ObservableObject {
     /// Whether hidden files are shown. Set from FileExplorerState externally.
     var showHiddenFiles: Bool = false
 
+    /// Persisted user preference for showing dotfiles in the file explorer.
+    /// Defaults to FALSE (hidden) — dotfiles are noise for most browsing. The
+    /// value is shared with `FileExplorerState` via the `fileExplorer.showHidden`
+    /// UserDefaults key, so a future toggle (or `defaults write`) flips it.
+    static var preferredShowHiddenFiles: Bool {
+        UserDefaults.standard.object(forKey: "fileExplorer.showHidden") as? Bool ?? false
+    }
+
     /// Watches the root directory for filesystem changes (local only).
     private var directoryWatcher: FileExplorerDirectoryWatcher?
 

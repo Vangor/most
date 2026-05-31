@@ -39,8 +39,9 @@ final class FileExplorerState: ObservableObject {
         self.width = storedWidth > 0 ? CGFloat(storedWidth) : 220
         let storedPosition = defaults.double(forKey: "fileExplorer.dividerPosition")
         self.dividerPosition = storedPosition > 0 ? CGFloat(storedPosition) : 0.6
-        let storedShowHidden = defaults.object(forKey: "fileExplorer.showHidden")
-        self.showHiddenFiles = storedShowHidden == nil ? true : defaults.bool(forKey: "fileExplorer.showHidden")
+        // Default to HIDDEN (dotfiles are noise for most browsing). Shares the
+        // `fileExplorer.showHidden` key with FileExplorerStore.preferredShowHiddenFiles.
+        self.showHiddenFiles = defaults.bool(forKey: "fileExplorer.showHidden")
         let storedMode = RightSidebarMode(rawValue: defaults.string(forKey: Self.modeKey) ?? "") ?? .files
         self.storedMode = Self.availableMode(storedMode, defaults: defaults)
         defaults.set(self.storedMode.rawValue, forKey: Self.modeKey)
