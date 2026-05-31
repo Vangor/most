@@ -134,6 +134,7 @@ public final class WorkstreamStore {
         if event.hookEventName == .sessionEnd {
             expireItems(forWorkstreamId: event.sessionId)
         }
+        supersedeAnsweredQuestions(inWorkstream: event.sessionId, before: event.receivedAt)
         let item = makeItem(from: event)
         insert(item)
         updateContextIndex(with: item)
@@ -166,6 +167,20 @@ public final class WorkstreamStore {
                   items[idx].workstreamId == workstreamId else { continue }
             items[idx].status = .expired(at: now)
             items[idx].updatedAt = now
+        }
+    }
+
+    /// AskUserQuestion/PermissionRequest hooks block the agent, so any
+    /// later event in the same workstream means the prior blocking question
+    /// has been answered and can leave the feed.
+    public func supersedeAnsweredQuestions(inWorkstream workstreamId: String, before cutoff: Date) {
+        for idx in items.indices {
+            guard items[idx].status.isPending,
+                  items[idx].kind.isActionable,
+                  items[idx].workstreamId == workstreamId,
+                  items[idx].createdAt < cutoff else { continue }
+            items[idx].status = .expired(at: cutoff)
+            items[idx].updatedAt = cutoff
         }
     }
 

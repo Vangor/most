@@ -188,6 +188,98 @@ struct WorkstreamStoreTests {
         }
     }
 
+    @Test("Later events supersede older actionable questions in the same workstream")
+    func laterEventsSupersedeOlderActionableQuestions() {
+        let t0 = Date(timeIntervalSince1970: 0)
+        let t1 = t0.addingTimeInterval(10)
+        let t2 = t1.addingTimeInterval(10)
+        let clock = TestClock(initial: t0)
+        let store = WorkstreamStore(ringCapacity: 10, clock: { clock.now })
+
+        store.ingest(.question("ws-1", requestId: "q1", at: t0))
+        #expect(store.items.count == 1)
+        #expect(store.items[0].status.isPending)
+
+        clock.advance(10)
+        store.ingest(WorkstreamEvent(
+            sessionId: "ws-1",
+            hookEventName: .preToolUse,
+            source: "claude",
+            toolName: "Read",
+            receivedAt: t1
+        ))
+
+        if case .expired = store.items[0].status {
+            // ok
+        } else {
+            Issue.record("older actionable question should expire after later event")
+        }
+        #expect(!store.items[0].status.isPending)
+
+        clock.advance(10)
+        store.ingest(.question("ws-1", requestId: "q2", at: t2))
+        #expect(store.items.count == 3)
+        #expect(store.items[2].status.isPending)
+
+        if case .expired = store.items[0].status {
+            // ok
+        } else {
+            Issue.record("first question should remain expired")
+        }
+        #expect(!store.items[0].status.isPending)
+        #expect(store.items[1].status == .telemetry)
+        #expect(store.items[2].status.isPending)
+    }
+
+    @Test("Out-of-order older events do not expire a newer pending question")
+    func outOfOrderOlderEventDoesNotExpireNewerQuestion() {
+        let t0 = Date(timeIntervalSince1970: 0)
+        let t1 = t0.addingTimeInterval(10)
+        let older = t0.addingTimeInterval(5)
+        let clock = TestClock(initial: t1)
+        let store = WorkstreamStore(ringCapacity: 10, clock: { clock.now })
+
+        store.ingest(.question("ws-1", requestId: "q1", at: t1))
+        #expect(store.items[0].status.isPending)
+
+        clock.advance(-5)
+        store.ingest(WorkstreamEvent(
+            sessionId: "ws-1",
+            hookEventName: .userPromptSubmit,
+            source: "claude",
+            toolInputJSON: #"{"prompt":"still old"}"#,
+            receivedAt: older
+        ))
+
+        #expect(store.items.count == 2)
+        #expect(store.items[0].status.isPending)
+        #expect(store.items[1].status == .telemetry)
+    }
+
+    @Test("Later events in a different workstream do not affect pending questions elsewhere")
+    func differentWorkstreamDoesNotSupersede() {
+        let t0 = Date(timeIntervalSince1970: 0)
+        let t1 = t0.addingTimeInterval(10)
+        let clock = TestClock(initial: t0)
+        let store = WorkstreamStore(ringCapacity: 10, clock: { clock.now })
+
+        store.ingest(.question("ws-1", requestId: "q1", at: t0))
+        clock.advance(10)
+        store.ingest(WorkstreamEvent(
+            sessionId: "ws-2",
+            hookEventName: .preToolUse,
+            source: "claude",
+            toolName: "Read",
+            receivedAt: t1
+        ))
+
+        #expect(store.items.count == 2)
+        #expect(store.items[0].workstreamId == "ws-1")
+        #expect(store.items[0].status.isPending)
+        #expect(store.items[1].workstreamId == "ws-2")
+        #expect(store.items[1].status == .telemetry)
+    }
+
     @Test("Prompt context carries into later permission requests")
     func promptContextCarriesIntoPermission() {
         let store = WorkstreamStore(ringCapacity: 10)
@@ -245,7 +337,7 @@ struct WorkstreamStoreTests {
     func dismissPendingItem() {
         let store = WorkstreamStore(ringCapacity: 10)
         store.ingest(.permission("s1", requestId: "r1"))
-        store.ingest(.permission("s1", requestId: "r2"))
+        store.ingest(.permission("s2", requestId: "r2"))
         let targetId = store.items[0].id
         #expect(store.items.count == 2)
         #expect(store.items[0].status.isPending)
@@ -291,7 +383,7 @@ struct WorkstreamStoreTests {
         store.ingest(.permission("s1", requestId: "r1"))
         store.ingest(.permission("s2", requestId: "r2"))
         store.ingest(WorkstreamEvent(
-            sessionId: "s1",
+            sessionId: "s3",
             hookEventName: .preToolUse,
             source: "claude",
             toolName: "Read"
@@ -403,6 +495,23 @@ private final class TestClock: @unchecked Sendable {
 }
 
 private extension WorkstreamEvent {
+    static func question(
+        _ sessionId: String,
+        requestId: String,
+        at date: Date = Date()
+    ) -> WorkstreamEvent {
+        WorkstreamEvent(
+            sessionId: sessionId,
+            hookEventName: .askUserQuestion,
+            source: "claude",
+            cwd: "/tmp",
+            toolName: "AskUserQuestion",
+            toolInputJSON: #"{"questions":[{"id":"q0","question":"Proceed?"}]}"#,
+            requestId: requestId,
+            receivedAt: date
+        )
+    }
+
     static func permission(
         _ sessionId: String,
         requestId: String,
