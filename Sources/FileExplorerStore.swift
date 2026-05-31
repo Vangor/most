@@ -25,7 +25,7 @@ enum FileExplorerStyle: Int, CaseIterable {
 
     var rowHeight: CGFloat {
         switch self {
-        case .liquidGlass: return 28
+        case .liquidGlass: return 32
         case .highDensity: return 20
         case .terminalStealth: return 24
         case .proStudio: return 32
@@ -65,7 +65,7 @@ enum FileExplorerStyle: Int, CaseIterable {
 
     var nameFont: NSFont {
         switch self {
-        case .liquidGlass: return .systemFont(ofSize: 15, weight: .medium)
+        case .liquidGlass: return .systemFont(ofSize: 17, weight: .medium)
         case .highDensity: return .systemFont(ofSize: 11, weight: .regular)
         case .terminalStealth: return .monospacedSystemFont(ofSize: 12, weight: .regular)
         case .proStudio: return .systemFont(ofSize: 14, weight: .semibold)
