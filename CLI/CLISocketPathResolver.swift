@@ -145,14 +145,32 @@ enum CLISocketPathResolver {
         currentUserID: uid_t = getuid(),
         inspectSocketPathEntry: (String) -> SocketPathEntry = inspectSocketPathEntry
     ) -> String {
-        guard source == .implicitDefault else {
+        // An explicit `--socket` flag is honored exactly — never silently
+        // redirected to a different instance.
+        guard source != .explicitFlag else {
             return requestedPath
         }
 
-        let variant = SocketPathMarkerFiles.variant(bundleIdentifier: bundleIdentifier, environment: environment)
-        if case .stable = variant,
-           canConnect(to: requestedPath, currentUserID: currentUserID, inspectSocketPathEntry: inspectSocketPathEntry) {
-            return requestedPath
+        if source == .environment {
+            // CMUX_SOCKET_PATH is set (e.g. an agent's feed/status hooks). Honor
+            // it while it's live, but when it's DEAD fall through to live-instance
+            // discovery below. This lets an agent reconnect to a still-running
+            // same-variant most instance after the one it was launched against was
+            // closed/restarted — otherwise its hooks report into a dead socket and
+            // the Feed / status pill silently go empty. A live socket returns here
+            // immediately (connect succeeds without the poll timeout), so there is
+            // no added latency in the common case.
+            if canConnect(to: requestedPath, currentUserID: currentUserID, inspectSocketPathEntry: inspectSocketPathEntry) {
+                return requestedPath
+            }
+        } else {
+            // .implicitDefault: the stable variant prefers the requested default
+            // path when it is live.
+            let variant = SocketPathMarkerFiles.variant(bundleIdentifier: bundleIdentifier, environment: environment)
+            if case .stable = variant,
+               canConnect(to: requestedPath, currentUserID: currentUserID, inspectSocketPathEntry: inspectSocketPathEntry) {
+                return requestedPath
+            }
         }
 
         let candidates = dedupe(candidatePaths(
