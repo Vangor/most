@@ -492,7 +492,10 @@ private struct FeedListView: View {
         let base: [WorkstreamItem]
         switch filter {
         case .actionable:
-            base = items.filter { $0.kind.isActionable }
+            // Keep only live actionable cards here; resolved/expired items
+            // still show up in the activity timeline, but they leave the
+            // actionable/pending lane as soon as the store resolves them.
+            base = items.filter { $0.kind.isActionable && $0.status.isPending }
         case .activity:
             // Actionable kinds + todos + stop. Tool use, user prompts,
             // assistant messages, session markers, and raw
@@ -1409,7 +1412,8 @@ struct FeedItemRow: View, Equatable {
                 context: displayContext,
                 onReply: { selections in
                     actions.replyQuestion(snapshot.id, selections)
-                }
+                },
+                fontScale: fontScale
             )
         case .stop:
             StopActionArea(
@@ -2773,6 +2777,9 @@ private struct QuestionActionArea: View {
     let onBlurRow: () -> Void
     let context: WorkstreamContext?
     let onReply: ([String]) -> Void
+    var fontScale: CGFloat = 1.0
+
+    private func rsScaled(_ base: CGFloat) -> CGFloat { base * fontScale }
 
     private static let skipInterviewAndPlanAnswer = "Skip interview and plan immediately"
     private static let customAnswerSelectionId = "__cmux_custom_answer__"
@@ -2882,27 +2889,27 @@ private struct QuestionActionArea: View {
         } label: {
             HStack(alignment: .top, spacing: 10) {
                 Text("\(index)")
-                    .font(.system(size: 11, weight: .bold).monospacedDigit())
+                    .font(.system(size: rsScaled(12), weight: .bold).monospacedDigit())
                     .foregroundColor(selected ? .white : .secondary)
-                    .frame(width: 20, height: 20)
+                    .frame(width: rsScaled(22), height: rsScaled(22))
                     .background(
                         RoundedRectangle(cornerRadius: 4, style: .continuous)
                             .fill(selected ? Color(red: 0.24, green: 0.48, blue: 0.88) : Color.primary.opacity(0.08))
                     )
                 VStack(alignment: .leading, spacing: 2) {
                     Text(option.label)
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.system(size: rsScaled(14), weight: .semibold))
                         .foregroundColor(.primary)
                     if let description = option.description, !description.isEmpty {
                         Text(description)
-                            .font(.system(size: 11))
+                            .font(.system(size: rsScaled(12)))
                             .foregroundColor(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
                 Spacer()
                 Image(systemName: selected ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.system(size: rsScaled(14), weight: .medium))
                     .foregroundColor(selected ? Color(red: 0.24, green: 0.48, blue: 0.88) : .secondary.opacity(0.45))
             }
             .padding(10)
