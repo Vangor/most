@@ -54,6 +54,28 @@ struct SessionIndexView: View {
     @StateObject private var dragCoordinator = SessionDragCoordinator()
     /// Sections the user has explicitly collapsed (default is expanded).
     @State private var collapsedSections: Set<SectionKey> = []
+    /// Scope categories (Main / Worktrees / Other) the user has collapsed.
+    /// Persisted to `UserDefaults` so e.g. a collapsed Worktrees group stays
+    /// collapsed across reloads and launches.
+    @State private var collapsedCategories: Set<VaultScopeCategory> = SessionIndexView.loadCollapsedCategories()
+    private static let collapsedCategoriesKey = "sessionIndex.collapsedCategories"
+
+    private static func loadCollapsedCategories() -> Set<VaultScopeCategory> {
+        let raw = UserDefaults.standard.stringArray(forKey: collapsedCategoriesKey) ?? []
+        return Set(raw.compactMap(VaultScopeCategory.init(persistenceKey:)))
+    }
+
+    private func toggleCategoryCollapsed(_ category: VaultScopeCategory) {
+        if collapsedCategories.contains(category) {
+            collapsedCategories.remove(category)
+        } else {
+            collapsedCategories.insert(category)
+        }
+        UserDefaults.standard.set(
+            collapsedCategories.map(\.persistenceKey),
+            forKey: Self.collapsedCategoriesKey
+        )
+    }
     /// Section whose "Show more" popover is currently open.
     @State private var openPopoverSection: SectionKey?
     @State private var previewEntry: SessionEntry?
@@ -240,12 +262,16 @@ struct SessionIndexView: View {
         return ScrollView(.vertical) {
             LazyVStack(alignment: .leading, spacing: 0) {
                 ForEach(categorized) { categoryGroup in
+                    let categoryCollapsed = showCategoryHeaders && collapsedCategories.contains(categoryGroup.category)
                     if showCategoryHeaders {
                         VaultCategoryHeaderView(
                             title: categoryGroup.categoryTitle,
-                            fontScale: fontScale
+                            fontScale: fontScale,
+                            isCollapsed: categoryCollapsed,
+                            onToggle: { toggleCategoryCollapsed(categoryGroup.category) }
                         )
                     }
+                    if !categoryCollapsed {
                     ForEach(Array(categoryGroup.sections.enumerated()), id: \.element.key) { index, section in
                         // Drop above this row -> insert dragged section BEFORE this section's key.
                         SectionReorderGap(
@@ -293,6 +319,7 @@ struct SessionIndexView: View {
                         ).equatable()
                         let _ = index
                     }
+                    }
                 }
                 // Trailing gap -> append.
                 SectionReorderGap(
@@ -315,19 +342,45 @@ struct SessionIndexView: View {
 private struct VaultCategoryHeaderView: View {
     let title: String
     var fontScale: CGFloat = 1.0
+    /// Whether this category's sections are currently hidden.
+    var isCollapsed: Bool = false
+    /// Toggles the collapsed state. When nil the header is non-interactive.
+    var onToggle: (() -> Void)? = nil
 
     private func rsScaled(_ base: CGFloat) -> CGFloat { base * fontScale }
 
+    private var label: some View {
+        HStack(spacing: 4) {
+            if onToggle != nil {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: rsScaled(8), weight: .bold))
+                    .foregroundColor(.secondary.opacity(0.55))
+                    .rotationEffect(.degrees(isCollapsed ? 0 : 90))
+            }
+            Text(title)
+                .font(.system(size: rsScaled(10), weight: .semibold))
+                .foregroundColor(.secondary.opacity(0.55))
+                .textCase(.uppercase)
+                .tracking(0.5)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 12)
+        .padding(.top, 10)
+        .padding(.bottom, 2)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+    }
+
     var body: some View {
-        Text(title)
-            .font(.system(size: rsScaled(10), weight: .semibold))
-            .foregroundColor(.secondary.opacity(0.55))
-            .textCase(.uppercase)
-            .tracking(0.5)
-            .padding(.horizontal, 12)
-            .padding(.top, 10)
-            .padding(.bottom, 2)
-            .frame(maxWidth: .infinity, alignment: .leading)
+        if let onToggle {
+            Button(action: onToggle) { label }
+                .buttonStyle(.plain)
+                .help(isCollapsed
+                    ? String(localized: "sessionIndex.category.expand", defaultValue: "Expand")
+                    : String(localized: "sessionIndex.category.collapse", defaultValue: "Collapse"))
+        } else {
+            label
+        }
     }
 }
 

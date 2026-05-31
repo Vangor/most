@@ -174,6 +174,25 @@ enum VaultScopeCategory: Hashable, Sendable {
     case worktrees
     /// Entry belongs to a different directory tree entirely.
     case other
+
+    /// Stable string key for persisting per-category UI state (e.g. which
+    /// categories the user has collapsed) to `UserDefaults`.
+    var persistenceKey: String {
+        switch self {
+        case .main: return "main"
+        case .worktrees: return "worktrees"
+        case .other: return "other"
+        }
+    }
+
+    init?(persistenceKey: String) {
+        switch persistenceKey {
+        case "main": self = .main
+        case "worktrees": self = .worktrees
+        case "other": self = .other
+        default: return nil
+        }
+    }
 }
 
 /// A group of sections belonging to one `VaultScopeCategory`. Produced by
@@ -460,33 +479,12 @@ final class SessionIndexStore: ObservableObject {
             return sections.isEmpty ? [] : [CategorizedVaultSections(category: .main, sections: sections)]
         }
 
-        let worktreesPrefix = dir + "/.worktrees/"
-        let dirPrefix = dir + "/"
-
-        func category(for entry: SessionEntry) -> VaultScopeCategory {
-            guard let cwd = normalizedDirectory(entry.cwd) else { return .other }
-            // Exact match to the current directory itself counts as Main.
-            if cwd == dir { return .main }
-            // Direct .worktrees child of dir (original top-level case).
-            if cwd.hasPrefix(worktreesPrefix) || cwd == (dir + "/.worktrees") { return .worktrees }
-            if cwd.hasPrefix(dirPrefix) {
-                // Any path inside the subtree that contains a /.worktrees/ component
-                // (e.g. <parent>/<repo>/.worktrees/<wt>) is classified as Worktrees.
-                // The slash delimiters prevent false matches on names like "foo.worktreesbar".
-                if cwd.range(of: "/.worktrees/") != nil || cwd.hasSuffix("/.worktrees") {
-                    return .worktrees
-                }
-                return .main
-            }
-            return .other
-        }
-
         // Partition ALL (unscoped) entries into three buckets.
         var mainEntries: [SessionEntry] = []
         var worktreeEntries: [SessionEntry] = []
         var otherEntries: [SessionEntry] = []
         for entry in entries {
-            switch category(for: entry) {
+            switch Self.scopeCategory(forCwd: entry.cwd, relativeTo: dir) {
             case .main: mainEntries.append(entry)
             case .worktrees: worktreeEntries.append(entry)
             case .other: otherEntries.append(entry)
@@ -888,12 +886,53 @@ final class SessionIndexStore: ObservableObject {
     }
 
     private func normalizedDirectory(_ value: String?) -> String? {
+        Self.normalizedDirectoryPath(value)
+    }
+
+    /// Static, pure normalization so categorization logic can be unit-tested
+    /// without instantiating a `@MainActor` store.
+    static func normalizedDirectoryPath(_ value: String?) -> String? {
         guard let value, !value.isEmpty else { return nil }
         var path = (value as NSString).standardizingPath
         if path.count > 1 && path.hasSuffix("/") {
             path.removeLast()
         }
         return path
+    }
+
+    /// Directory markers that identify a git worktree checkout. BOTH conventions
+    /// are in active use across the user's repos and must be recognized:
+    ///   - `/.worktrees/`        — the ops-layer `/si` skill convention.
+    ///   - `/.claude/worktrees/` — Claude Code's agent worktrees, used by cmux
+    ///     itself (e.g. `~/Git/cmux/.claude/worktrees/agent-…`).
+    /// Matching only the first marker (the original bug) left every cmux worktree
+    /// session classified as `.main`, so the "Worktrees" header never appeared.
+    static let worktreeMarkers = ["/.claude/worktrees/", "/.worktrees/"]
+
+    /// Returns true if `path` sits inside (or exactly is) a recognized worktree
+    /// container. Slash delimiters prevent false matches on names like
+    /// `foo.worktreesbar`.
+    static func isWorktreePath(_ path: String) -> Bool {
+        for marker in worktreeMarkers {
+            if path.range(of: marker) != nil { return true }
+            // `<repo>/.worktrees` or `<repo>/.claude/worktrees` with no trailing leaf.
+            if path.hasSuffix(String(marker.dropLast())) { return true }
+        }
+        return false
+    }
+
+    /// Classifies `rawCwd` relative to reference directory `rawDir` into
+    /// Main / Worktrees / Other. Pure + static so it is directly unit-testable.
+    static func scopeCategory(forCwd rawCwd: String?, relativeTo rawDir: String) -> VaultScopeCategory {
+        guard let dir = normalizedDirectoryPath(rawDir),
+              let cwd = normalizedDirectoryPath(rawCwd) else { return .other }
+        if cwd == dir { return .main }
+        // Inside the reference subtree: Worktrees if it carries a worktree marker,
+        // otherwise Main. Outside the subtree: Other.
+        if cwd.hasPrefix(dir + "/") {
+            return isWorktreePath(cwd) ? .worktrees : .main
+        }
+        return .other
     }
 
     // MARK: - Scanning
@@ -950,7 +989,7 @@ final class SessionIndexStore: ObservableObject {
         return entries.filter { $0.modified >= cutoff }
     }
 
-    private struct ClaudeParsed {
+    struct ClaudeParsed {
         var title: String = ""
         var cwd: String?
         var branch: String?
@@ -1030,13 +1069,27 @@ final class SessionIndexStore: ObservableObject {
         return roots
     }
 
-    nonisolated private static func extractClaudeMetadata(head: String, tail: String, projectDir: String) -> ClaudeParsed {
+    nonisolated static func extractClaudeMetadata(head: String, tail: String, projectDir: String) -> ClaudeParsed {
         var out = ClaudeParsed()
         out.cwd = decodeClaudeProjectDir(projectDir)
+
+        // The Claude transcript carries a self-assigned session name in a
+        // `{"type":"custom-title","customTitle":"…"}` entry (what `claude
+        // --resume` shows and what `/title` sets). It's a real NAME, so it wins
+        // over the first-user-message fallback. A later entry (mid-session
+        // rename) overrides an earlier one, so tail (processed second) wins.
+        var customTitle: String?
+        func captureCustomTitle(_ obj: [String: Any]) {
+            guard (obj["type"] as? String) == "custom-title",
+                  let raw = obj["customTitle"] as? String else { return }
+            let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty { customTitle = trimmed }
+        }
 
         for line in head.split(separator: "\n", omittingEmptySubsequences: true) {
             guard let data = line.data(using: .utf8),
                   let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { continue }
+            captureCustomTitle(obj)
             let isMeta = (obj["isMeta"] as? Bool) ?? false
             if let cwdField = obj["cwd"] as? String, !cwdField.isEmpty {
                 out.cwd = cwdField
@@ -1075,6 +1128,7 @@ final class SessionIndexStore: ObservableObject {
         for line in tail.split(separator: "\n", omittingEmptySubsequences: true) {
             guard let data = line.data(using: .utf8),
                   let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { continue }
+            captureCustomTitle(obj)
             let type = obj["type"] as? String
             if type == "pr-link", let number = obj["prNumber"] as? Int,
                let url = obj["prUrl"] as? String {
@@ -1099,6 +1153,11 @@ final class SessionIndexStore: ObservableObject {
         // Strip the [1m] suffix some Claude internal model IDs carry (claude-opus-4-7[1m]).
         if let m = out.model, let bracket = m.firstIndex(of: "[") {
             out.model = String(m[..<bracket])
+        }
+        // A self-assigned session title is a real name — prefer it over the
+        // first-user-message fallback captured above.
+        if let customTitle {
+            out.title = customTitle
         }
         return out
     }

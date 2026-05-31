@@ -2878,7 +2878,7 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/cmux DEV.app/Contents/MacOS/cmux DEV";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/most DEV.app/Contents/MacOS/most DEV";
 				TEST_TARGET_NAME = cmux;
 			};
 			name = Debug;
@@ -2896,7 +2896,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.4etverg.most.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/cmux.app/Contents/MacOS/cmux";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/most.app/Contents/MacOS/most";
 				TEST_TARGET_NAME = cmux;
 			};
 			name = Release;

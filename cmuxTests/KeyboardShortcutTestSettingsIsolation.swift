@@ -1,6 +1,10 @@
 import Foundation
 
-#if canImport(cmux_DEV)
+#if canImport(most_DEV)
+@testable import most_DEV
+#elseif canImport(most)
+@testable import most
+#elseif canImport(cmux_DEV)
 @testable import cmux_DEV
 #elseif canImport(cmux)
 @testable import cmux
