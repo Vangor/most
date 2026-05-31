@@ -10312,7 +10312,7 @@ class TerminalController {
         let envOverrides = (params["env"] as? [String: String]) ?? [:]
 
         guard let cmuxURL = Bundle.main.resourceURL?
-            .appendingPathComponent("bin/cmux", isDirectory: false),
+            .appendingPathComponent("bin/most", isDirectory: false),
               FileManager.default.isExecutableFile(atPath: cmuxURL.path) else {
             return .err(code: "unavailable", message: "bundled cmux CLI not found", data: nil)
         }

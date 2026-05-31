@@ -6214,7 +6214,7 @@ final class TerminalSurface: Identifiable, ObservableObject {
            !inheritedClaudeConfigDir.isEmpty {
             env["CLAUDE_CONFIG_DIR"] = ClaudeConfigDirectoryPath.preferredPath(inheritedClaudeConfigDir)
         }
-        if let bundledCLIURL = Bundle.main.resourceURL?.appendingPathComponent("bin/cmux"),
+        if let bundledCLIURL = Bundle.main.resourceURL?.appendingPathComponent("bin/most"),
            FileManager.default.isExecutableFile(atPath: bundledCLIURL.path) {
             setManagedEnvironmentValue("CMUX_BUNDLED_CLI_PATH", bundledCLIURL.path)
         }

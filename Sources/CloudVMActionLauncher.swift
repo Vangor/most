@@ -20,7 +20,7 @@ final class CloudVMActionLauncher {
 
     @discardableResult
     func start(socketPath: String, preferredWindow: NSWindow?) -> Bool {
-        let cliURL = Bundle.main.resourceURL?.appendingPathComponent("bin/cmux")
+        let cliURL = Bundle.main.resourceURL?.appendingPathComponent("bin/most")
         guard let cliURL,
               FileManager.default.isExecutableFile(atPath: cliURL.path) else {
             presentStartFailure(
