@@ -168,7 +168,6 @@
 		E30750000000000000000004 /* CmuxWorkspaceDefinition.swift in Sources */ = {isa = PBXBuildFile; fileRef = E30750000000000000000003 /* CmuxWorkspaceDefinition.swift */; };
 		AA11BB22CC33DD44EE550001 /* CMUXWorkstream in Frameworks */ = {isa = PBXBuildFile; productRef = AA11BB22CC33DD44EE550002 /* CMUXWorkstream */; };
 		C4041001000000000000001B /* CommandClickFileOpenRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4041001000000000000001A /* CommandClickFileOpenRouter.swift */; };
-		SREDA00010000000000000002 /* SredaServerPathRewriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = SREDA00010000000000000001 /* SredaServerPathRewriter.swift */; };
 		C0DE32470000000000000005 /* CommandPaletteIdentifierClipboardUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE32470000000000000006 /* CommandPaletteIdentifierClipboardUITests.swift */; };
 		C0DEC0DE000000000000F202 /* CommandPaletteNucleoFFILibrarySupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DEC0DE000000000000F201 /* CommandPaletteNucleoFFILibrarySupport.swift */; };
 		C0DEC0DE000000000000F102 /* CommandPaletteNucleoFFITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DEC0DE000000000000F101 /* CommandPaletteNucleoFFITests.swift */; };
@@ -413,6 +412,7 @@
 		C510C1E00000000000000002 /* SocketOperationTelemetry.swift in Sources */ = {isa = PBXBuildFile; fileRef = C510C1E00000000000000001 /* SocketOperationTelemetry.swift */; };
 		A5001230 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = A5001231 /* Sparkle */; };
 		E3309A0D /* SplitEqualizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3309A0E /* SplitEqualizer.swift */; };
+		SREDA00010000000000000002 /* SredaServerPathRewriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = SREDA00010000000000000001 /* SredaServerPathRewriter.swift */; };
 		A95F100100000000000000A1 /* SSHStandardURLRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A95F100100000000000000A2 /* SSHStandardURLRequest.swift */; };
 		F6355600A1B2C3D4E5F60718 /* SSHStartupSignalLifecycleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6355601A1B2C3D4E5F60718 /* SSHStartupSignalLifecycleTests.swift */; };
 		F20F85FC5900550685FA33AD /* StackAuth in Frameworks */ = {isa = PBXBuildFile; productRef = A8BD195031FC4B82B4354297 /* StackAuth */; };
@@ -755,7 +755,6 @@
 		D0B1000DA1B2C3D4E5F60001 /* CmuxWebViewDragRoutingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CmuxWebViewDragRoutingTests.swift; sourceTree = "<group>"; };
 		E30750000000000000000003 /* CmuxWorkspaceDefinition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CmuxWorkspaceDefinition.swift; sourceTree = "<group>"; };
 		C4041001000000000000001A /* CommandClickFileOpenRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandClickFileOpenRouter.swift; sourceTree = "<group>"; };
-		SREDA00010000000000000001 /* SredaServerPathRewriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SredaServerPathRewriter.swift; sourceTree = "<group>"; };
 		C0DE32470000000000000006 /* CommandPaletteIdentifierClipboardUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandPaletteIdentifierClipboardUITests.swift; sourceTree = "<group>"; };
 		C0DEC0DE000000000000F201 /* CommandPaletteNucleoFFILibrarySupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandPaletteNucleoFFILibrarySupport.swift; sourceTree = "<group>"; };
 		C0DEC0DE000000000000F101 /* CommandPaletteNucleoFFITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandPaletteNucleoFFITests.swift; sourceTree = "<group>"; };
@@ -994,6 +993,7 @@
 		A5001225 /* SocketControlSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SocketControlSettings.swift; sourceTree = "<group>"; };
 		C510C1E00000000000000001 /* SocketOperationTelemetry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SocketOperationTelemetry.swift; sourceTree = "<group>"; };
 		E3309A0E /* SplitEqualizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitEqualizer.swift; sourceTree = "<group>"; };
+		SREDA00010000000000000001 /* SredaServerPathRewriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SredaServerPathRewriter.swift; sourceTree = "<group>"; };
 		A95F100100000000000000A2 /* SSHStandardURLRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SSHStandardURLRequest.swift; sourceTree = "<group>"; };
 		F6355601A1B2C3D4E5F60718 /* SSHStartupSignalLifecycleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SSHStartupSignalLifecycleTests.swift; sourceTree = "<group>"; };
 		D35B71010000000000000002 /* StartupBreadcrumbLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/StartupBreadcrumbLog.swift; sourceTree = "<group>"; };
@@ -2127,7 +2127,6 @@
 				A5001500 /* CmuxWebView.swift in Sources */,
 				E30750000000000000000004 /* CmuxWorkspaceDefinition.swift in Sources */,
 				C4041001000000000000001B /* CommandClickFileOpenRouter.swift in Sources */,
-				SREDA00010000000000000002 /* SredaServerPathRewriter.swift in Sources */,
 				C0DEFF100000000000000001 /* CommandPaletteNucleoSearch.swift in Sources */,
 				C0DEFF200000000000000001 /* CommandPaletteOverlay.swift in Sources */,
 				A8CBA43C2DA5AB9E3A1E65A4 /* CommandPaletteSearch.swift in Sources */,
@@ -2280,6 +2279,7 @@
 				A5354301A5354301A5354301 /* SocketControlSettings+SocketPathMarkers.swift in Sources */,
 				A5001226 /* SocketControlSettings.swift in Sources */,
 					E3309A0D /* SplitEqualizer.swift in Sources */,
+				SREDA00010000000000000002 /* SredaServerPathRewriter.swift in Sources */,
 				A95F100100000000000000A1 /* SSHStandardURLRequest.swift in Sources */,
 				D35B71010000000000000001 /* StartupBreadcrumbLog.swift in Sources */,
 				A5001303 /* SurfaceSearchOverlay.swift in Sources */,
@@ -2696,6 +2696,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 0.64.10;
+				MOST_DISPLAY_NAME = "$(PRODUCT_NAME)";
 				OTHER_LDFLAGS = (
 					"-lc++",
 					"-framework",
@@ -2736,6 +2737,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 0.64.10;
+				MOST_DISPLAY_NAME = Most;
 				ONLY_ACTIVE_ARCH = NO;
 				OTHER_LDFLAGS = (
 					"-lc++",
