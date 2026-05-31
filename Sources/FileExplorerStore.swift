@@ -65,7 +65,7 @@ enum FileExplorerStyle: Int, CaseIterable {
 
     var nameFont: NSFont {
         switch self {
-        case .liquidGlass: return .systemFont(ofSize: 13, weight: .medium)
+        case .liquidGlass: return .systemFont(ofSize: 15, weight: .medium)
         case .highDensity: return .systemFont(ofSize: 11, weight: .regular)
         case .terminalStealth: return .monospacedSystemFont(ofSize: 12, weight: .regular)
         case .proStudio: return .systemFont(ofSize: 14, weight: .semibold)
