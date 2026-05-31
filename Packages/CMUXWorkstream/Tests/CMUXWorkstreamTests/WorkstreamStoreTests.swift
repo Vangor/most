@@ -73,6 +73,34 @@ struct WorkstreamStoreTests {
         #expect(!store.hasMorePersistedItems)
     }
 
+    @Test("start expires restored pending actionable items so they don't resurrect as stale cards")
+    func startExpiresRestoredPending() async throws {
+        let tmp = FileManager.default.temporaryDirectory
+            .appendingPathComponent("cmux-workstream-store-restore-\(UUID().uuidString).jsonl")
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        let persistence = WorkstreamPersistence(fileURL: tmp)
+        // Persist two pending actionable questions (as the append-only log
+        // would have recorded them while still pending).
+        for i in 0..<2 {
+            try await persistence.append(WorkstreamItem(
+                workstreamId: "s\(i)",
+                source: .claude,
+                kind: .permissionRequest,
+                payload: .permissionRequest(requestId: "r\(i)", toolName: "t", toolInputJSON: "{}", pattern: nil)
+            ))
+        }
+        let store = WorkstreamStore(
+            persistence: persistence,
+            ringCapacity: 10,
+            initialLoadLimit: 10,
+            historyPageSize: 10
+        )
+        await store.start()
+        // Both items remain in history, but none are pending after load.
+        #expect(store.items.count == 2)
+        #expect(store.items.allSatisfy { !$0.status.isPending })
+    }
+
     @Test("expireAbandonedItems expires items whose agent PID is dead")
     func expireAbandoned() {
         let clock = TestClock(initial: Date(timeIntervalSince1970: 0))

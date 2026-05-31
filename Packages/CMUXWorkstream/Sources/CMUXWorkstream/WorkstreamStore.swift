@@ -74,6 +74,7 @@ public final class WorkstreamStore {
                 items = page.items
                 hasMorePersistedItems = page.hasMoreBefore
                 oldestLoadedPersistenceOffset = page.startOffset
+                expireRestoredPendingActionable()
                 rebuildContextIndex()
             }
         }
@@ -112,10 +113,28 @@ public final class WorkstreamStore {
         let olderItems = page.items.filter { !existingIds.contains($0.id) }
         if !olderItems.isEmpty {
             items.insert(contentsOf: olderItems, at: 0)
+            expireRestoredPendingActionable()
         }
         self.oldestLoadedPersistenceOffset = page.startOffset ?? oldestLoadedPersistenceOffset
         hasMorePersistedItems = page.hasMoreBefore
         rebuildContextIndex()
+    }
+
+    /// Expires every restored `.pending` actionable item. The JSONL log is
+    /// append-only and never records status transitions, so questions that
+    /// were answered/abandoned in a previous app run would otherwise reload
+    /// as `.pending` and show up as stale "unanswered" cards on every launch.
+    /// A question that was pending when the app last closed is no longer
+    /// blocking THIS instance — its hook process is gone (or belongs to
+    /// another instance). Live questions arrive from live hooks after
+    /// `start()` subscribes to the transport, so they are unaffected.
+    private func expireRestoredPendingActionable() {
+        let now = clock()
+        for idx in items.indices {
+            guard items[idx].status.isPending, items[idx].kind.isActionable else { continue }
+            items[idx].status = .expired(at: now)
+            items[idx].updatedAt = now
+        }
     }
 
     // MARK: - Ingest
